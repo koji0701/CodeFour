@@ -1,37 +1,29 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react"
-import dynamic from "next/dynamic"
+import { Stage, Layer, Rect, Transformer } from 'react-konva'
 import type { BoundingBox, VideoInfo } from "@/lib/types"
 
 interface BoundingBoxCanvasProps {
   videoElement: HTMLVideoElement
   boundingBoxes: BoundingBox[]
   videoInfo: VideoInfo
+  /** Whether the video is currently playing. Used to disable dragging while playing */
+  isPlaying: boolean
   onBoundingBoxUpdate: (boxes: BoundingBox[]) => void
 }
 
-// Dynamically import Konva components to prevent SSR issues
-const Stage = dynamic(() => import("react-konva").then(mod => ({ default: mod.Stage })), { ssr: false })
-const Layer = dynamic(() => import("react-konva").then(mod => ({ default: mod.Layer })), { ssr: false })
-const Rect = dynamic(() => import("react-konva").then(mod => ({ default: mod.Rect })), { ssr: false })
-const Transformer = dynamic(() => import("react-konva").then(mod => ({ default: mod.Transformer })), { ssr: false })
-
-export default function BoundingBoxCanvas({
+function BoundingBoxCanvas({
   videoElement,
   boundingBoxes,
   videoInfo,
+  isPlaying,
   onBoundingBoxUpdate,
 }: BoundingBoxCanvasProps) {
   const stageRef = useRef<any>(null)
   const transformerRef = useRef<any>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 })
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   useEffect(() => {
     const updateStageSize = () => {
@@ -72,7 +64,9 @@ export default function BoundingBoxCanvas({
   }, [selectedId])
 
   const handleRectClick = (id: string) => {
-    setSelectedId(id === selectedId ? null : id)
+    if (!isPlaying) {
+      setSelectedId(id === selectedId ? null : id)
+    }
   }
 
   const handleStageClick = (e: any) => {
@@ -132,7 +126,13 @@ export default function BoundingBoxCanvas({
     }
   }
 
-  if (!mounted || stageSize.width === 0 || stageSize.height === 0) {
+  const getBoxColor = (confidence: number) => {
+    if (confidence > 0.9) return "#10b981" // green
+    if (confidence > 0.7) return "#f59e0b" // amber
+    return "#ef4444" // red
+  }
+
+  if (stageSize.width === 0 || stageSize.height === 0) {
     return null
   }
 
@@ -143,11 +143,13 @@ export default function BoundingBoxCanvas({
         width={stageSize.width}
         height={stageSize.height}
         onClick={handleStageClick}
-        className="pointer-events-auto"
+        className={isPlaying ? "pointer-events-none" : "pointer-events-auto"}
+        style={{ pointerEvents: isPlaying ? 'none' : 'auto' }}
       >
         <Layer>
           {boundingBoxes.map((box) => {
             const pixelCoords = convertNormalizedToPixel(box, stageSize.width, stageSize.height)
+            const color = getBoxColor(box.confidence)
 
             return (
               <Rect
@@ -157,29 +159,36 @@ export default function BoundingBoxCanvas({
                 y={pixelCoords.y}
                 width={pixelCoords.width}
                 height={pixelCoords.height}
-                stroke="#10b981"
+                stroke={color}
                 strokeWidth={2}
-                fill="rgba(16, 185, 129, 0.1)"
-                draggable
+                fill={`${color}33`}
+                draggable={!isPlaying}
                 onClick={() => handleRectClick(box.id)}
+                onTap={() => handleRectClick(box.id)}
                 onDragEnd={(e) => handleRectDragEnd(box.id, e)}
                 onTransformEnd={(e) => handleRectTransform(box.id, e)}
+                listening={!isPlaying}
               />
             )
           })}
 
-          <Transformer
-            ref={transformerRef}
-            boundBoxFunc={(oldBox, newBox) => {
-              // Limit resize
-              if (newBox.width < 10 || newBox.height < 10) {
-                return oldBox
-              }
-              return newBox
-            }}
-          />
+          {selectedId && !isPlaying && (
+            <Transformer
+              ref={transformerRef}
+              boundBoxFunc={(oldBox, newBox) => {
+                // Limit resize
+                if (newBox.width < 10 || newBox.height < 10) {
+                  return oldBox
+                }
+                return newBox
+              }}
+              enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right']}
+            />
+          )}
         </Layer>
       </Stage>
     </div>
   )
 }
+
+export default BoundingBoxCanvas

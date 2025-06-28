@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useCallback } from "react"
@@ -73,6 +72,7 @@ export default function VideoAnnotationEditor() {
                     videoElement={videoElement}
                     boundingBoxes={currentBoundingBoxes}
                     videoInfo={annotationData.video_info}
+                    isPlaying={isPlaying}
                     onBoundingBoxUpdate={(boxes) => handleBoundingBoxUpdate(currentFrame, boxes)}
                   />
                 )}

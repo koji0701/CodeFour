@@ -13,6 +13,13 @@ const nextConfig = {
     config.externals = [...config.externals, { canvas: 'canvas' }];
     return config;
   },
+  experimental: {
+    turbo: {
+      resolveAlias: {
+        canvas: './empty.js',
+      },
+    },
+  },
 }
 
 export default nextConfig
