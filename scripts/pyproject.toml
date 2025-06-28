@@ -1,0 +1,11 @@
+[project]
+name = "scripts"
+version = "0.1.0"
+description = "Face detection video processing with YOLO for annotation export"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "ultralytics>=8.0.0",
+    "opencv-python>=4.8.0",
+    "numpy>=1.24.0"
+]
