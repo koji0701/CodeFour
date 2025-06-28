@@ -24,31 +24,68 @@ function BoundingBoxCanvas({
   const transformerRef = useRef<any>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 })
+  const [videoDisplayArea, setVideoDisplayArea] = useState({ 
+    x: 0, 
+    y: 0, 
+    width: 0, 
+    height: 0,
+    scaleX: 1,
+    scaleY: 1
+  })
 
-  useEffect(() => {
-    const updateStageSize = () => {
-      if (videoElement) {
-        const rect = videoElement.getBoundingClientRect()
-        setStageSize({
-          width: rect.width,
-          height: rect.height,
-        })
-      }
+  // Calculate the actual video display area within the video element
+  const calculateVideoDisplayArea = () => {
+    if (!videoElement || !videoInfo) return
+
+    const elementRect = videoElement.getBoundingClientRect()
+    const videoAspectRatio = videoInfo.width / videoInfo.height
+    const elementAspectRatio = elementRect.width / elementRect.height
+
+    let displayWidth, displayHeight, offsetX, offsetY
+
+    if (elementAspectRatio > videoAspectRatio) {
+      // Element is wider than video - letterboxed on sides
+      displayHeight = elementRect.height
+      displayWidth = displayHeight * videoAspectRatio
+      offsetX = (elementRect.width - displayWidth) / 2
+      offsetY = 0
+    } else {
+      // Element is taller than video - letterboxed on top/bottom
+      displayWidth = elementRect.width
+      displayHeight = displayWidth / videoAspectRatio
+      offsetX = 0
+      offsetY = (elementRect.height - displayHeight) / 2
     }
 
-    updateStageSize()
-    window.addEventListener("resize", updateStageSize)
+    setVideoDisplayArea({
+      x: offsetX,
+      y: offsetY,
+      width: displayWidth,
+      height: displayHeight,
+      scaleX: displayWidth / videoInfo.width,
+      scaleY: displayHeight / videoInfo.height
+    })
 
-    const resizeObserver = new ResizeObserver(updateStageSize)
+    setStageSize({
+      width: elementRect.width,
+      height: elementRect.height,
+    })
+  }
+
+  useEffect(() => {
+    calculateVideoDisplayArea()
+    window.addEventListener("resize", calculateVideoDisplayArea)
+
+    const resizeObserver = new ResizeObserver(calculateVideoDisplayArea)
     if (videoElement) {
       resizeObserver.observe(videoElement)
     }
 
     return () => {
-      window.removeEventListener("resize", updateStageSize)
+      window.removeEventListener("resize", calculateVideoDisplayArea)
       resizeObserver.disconnect()
     }
-  }, [videoElement])
+  }, [videoElement, videoInfo])
 
   useEffect(() => {
     if (transformerRef.current && selectedId) {
@@ -80,10 +117,14 @@ function BoundingBoxCanvas({
     
     const updatedBoxes = boundingBoxes.map((box) => {
       if (box.id === id) {
+        // Convert back to normalized coordinates relative to video display area
+        const normalizedX = (rect.x() - videoDisplayArea.x) / videoDisplayArea.width
+        const normalizedY = (rect.y() - videoDisplayArea.y) / videoDisplayArea.height
+        
         return {
           ...box,
-          x: rect.x() / stageSize.width,
-          y: rect.y() / stageSize.height,
+          x: Math.max(0, Math.min(1, normalizedX)),
+          y: Math.max(0, Math.min(1, normalizedY)),
         }
       }
       return box
@@ -99,12 +140,18 @@ function BoundingBoxCanvas({
 
     const updatedBoxes = boundingBoxes.map((box) => {
       if (box.id === id) {
+        // Convert back to normalized coordinates relative to video display area
+        const normalizedX = (rect.x() - videoDisplayArea.x) / videoDisplayArea.width
+        const normalizedY = (rect.y() - videoDisplayArea.y) / videoDisplayArea.height
+        const normalizedWidth = (rect.width() * scaleX) / videoDisplayArea.width
+        const normalizedHeight = (rect.height() * scaleY) / videoDisplayArea.height
+        
         return {
           ...box,
-          x: rect.x() / stageSize.width,
-          y: rect.y() / stageSize.height,
-          width: (rect.width() * scaleX) / stageSize.width,
-          height: (rect.height() * scaleY) / stageSize.height,
+          x: Math.max(0, Math.min(1, normalizedX)),
+          y: Math.max(0, Math.min(1, normalizedY)),
+          width: Math.max(0, Math.min(1 - normalizedX, normalizedWidth)),
+          height: Math.max(0, Math.min(1 - normalizedY, normalizedHeight)),
         }
       }
       return box
@@ -117,12 +164,13 @@ function BoundingBoxCanvas({
     onBoundingBoxUpdate(updatedBoxes)
   }
 
-  const convertNormalizedToPixel = (box: BoundingBox, canvasWidth: number, canvasHeight: number) => {
+  const convertNormalizedToPixel = (box: BoundingBox) => {
+    // Convert normalized coordinates to pixel coordinates within the video display area
     return {
-      x: box.x * canvasWidth,
-      y: box.y * canvasHeight,
-      width: box.width * canvasWidth,
-      height: box.height * canvasHeight,
+      x: videoDisplayArea.x + (box.x * videoDisplayArea.width),
+      y: videoDisplayArea.y + (box.y * videoDisplayArea.height),
+      width: box.width * videoDisplayArea.width,
+      height: box.height * videoDisplayArea.height,
     }
   }
 
@@ -132,7 +180,7 @@ function BoundingBoxCanvas({
     return "#ef4444" // red
   }
 
-  if (stageSize.width === 0 || stageSize.height === 0) {
+  if (stageSize.width === 0 || stageSize.height === 0 || videoDisplayArea.width === 0) {
     return null
   }
 
@@ -148,7 +196,7 @@ function BoundingBoxCanvas({
       >
         <Layer>
           {boundingBoxes.map((box) => {
-            const pixelCoords = convertNormalizedToPixel(box, stageSize.width, stageSize.height)
+            const pixelCoords = convertNormalizedToPixel(box)
             const color = getBoxColor(box.confidence)
 
             return (

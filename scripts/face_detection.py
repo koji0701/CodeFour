@@ -15,7 +15,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple, Any, Optional
 import cv2
 import numpy as np
 from ultralytics import YOLO
@@ -26,16 +26,19 @@ class FaceDetectionProcessor:
     Processes videos using YOLO models to detect faces and export annotations.
     """
     
-    def __init__(self, model_path: str = "yolo11n.pt", confidence: float = 0.25):
+    def __init__(self, model_path: str = "yolo11n-face.pt", confidence: float = 0.25, target_classes: Optional[List[str]] = None):
         """
         Initialize the face detection processor.
         
         Args:
             model_path: Path to the YOLO model file
             confidence: Confidence threshold for detections
+            target_classes: List of class names to keep from YOLO detections (defaults to ["face"])
         """
         self.confidence = confidence
         self.model_path = model_path
+        # Keep only these class names when parsing detections. Defaults to just "face".
+        self.target_classes = set(target_classes or ["face"])
         self.model = None
         self._load_model()
     
@@ -119,11 +122,24 @@ class FaceDetectionProcessor:
                                 xyxy = boxes.xyxy.cpu().numpy()
                                 conf = boxes.conf.cpu().numpy() if hasattr(boxes, 'conf') and boxes.conf is not None else []
                                 
+                                # Retrieve class indices for each detection (if available)
+                                cls_indices = (
+                                    boxes.cls.cpu().numpy()
+                                    if hasattr(boxes, 'cls') and boxes.cls is not None
+                                    else None
+                                )
+                                
                                 # Ensure we have matching number of boxes and confidences
                                 num_detections = min(len(xyxy), len(conf)) if len(conf) > 0 else len(xyxy)
                                 
                                 # Process each detection
                                 for i in range(num_detections):
+                                    # Filter by allowed classes first (if cls information is present)
+                                    if cls_indices is not None and hasattr(result, 'names'):
+                                        class_name = result.names.get(int(cls_indices[i]), "")
+                                        if self.target_classes and class_name not in self.target_classes:
+                                            # Skip any detection not in the allowed class list
+                                            continue
                                     try:
                                         # Get bounding box coordinates (xyxy format)
                                         if len(xyxy[i]) >= 4:
