@@ -3,7 +3,7 @@
 YOLO Face Detection Video Processor
 
 This script processes video files to detect faces using YOLO models and exports
-the detection results to JSON format for use in the React Native video annotation app.
+the detection results to JSON format for use in the React video annotation app.
 
 Usage:
     python face_detection.py --video path/to/video.mp4 --output annotations.json

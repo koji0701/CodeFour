@@ -50,7 +50,7 @@ def main():
         print("\n" + "="*60)
         print("Processing completed successfully!")
         print("JSON annotation files have been saved to the assets-json directory.")
-        print("You can now use these files in your React Native application.")
+        print("You can now use these files in your React application.")
         
     except Exception as e:
         print(f"Error during processing: {e}")

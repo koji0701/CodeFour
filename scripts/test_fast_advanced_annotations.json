@@ -1,0 +1,26 @@
+{
+  "video_info": {
+    "filename": "test_fast.mp4",
+    "width": 800,
+    "height": 600,
+    "fps": 30,
+    "frame_count": 150,
+    "duration": 5.0,
+    "processing_settings": {
+      "model": "yolo11n.pt",
+      "confidence": 0.3,
+      "sample_rate": 2,
+      "min_face_size": 0.02,
+      "max_face_size": 1.0,
+      "nms_threshold": 0.45
+    }
+  },
+  "annotations": {},
+  "statistics": {
+    "frames_processed": 0,
+    "frames_with_faces": 0,
+    "total_detections": 0,
+    "avg_faces_per_frame": 0,
+    "processing_time": 5.66781210899353
+  }
+}
