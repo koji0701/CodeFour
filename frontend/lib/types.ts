@@ -14,6 +14,7 @@ export interface BoundingBox {
   width: number
   height: number
   confidence: number
+  type: "ai-generated" | "human"
   class: string
 }
 

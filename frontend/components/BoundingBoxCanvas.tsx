@@ -125,6 +125,7 @@ function BoundingBoxCanvas({
           ...box,
           x: Math.max(0, Math.min(1, normalizedX)),
           y: Math.max(0, Math.min(1, normalizedY)),
+          type: "human" as const,
         }
       }
       return box
@@ -152,6 +153,7 @@ function BoundingBoxCanvas({
           y: Math.max(0, Math.min(1, normalizedY)),
           width: Math.max(0, Math.min(1 - normalizedX, normalizedWidth)),
           height: Math.max(0, Math.min(1 - normalizedY, normalizedHeight)),
+          type: "human" as const,
         }
       }
       return box
@@ -174,7 +176,13 @@ function BoundingBoxCanvas({
     }
   }
 
-  const getBoxColor = (confidence: number) => {
+  const getBoxColor = (confidence: number, type: "ai-generated" | "human") => {
+    // Human-modified boxes get a blue color regardless of confidence
+    if (type === "human") {
+      return "#3b82f6" // blue
+    }
+    
+    // AI-generated boxes use confidence-based colors
     if (confidence > 0.9) return "#10b981" // green
     if (confidence > 0.7) return "#f59e0b" // amber
     return "#ef4444" // red
@@ -197,7 +205,7 @@ function BoundingBoxCanvas({
         <Layer>
           {boundingBoxes.map((box) => {
             const pixelCoords = convertNormalizedToPixel(box)
-            const color = getBoxColor(box.confidence)
+            const color = getBoxColor(box.confidence, box.type)
 
             return (
               <Rect
@@ -208,7 +216,7 @@ function BoundingBoxCanvas({
                 width={pixelCoords.width}
                 height={pixelCoords.height}
                 stroke={color}
-                strokeWidth={2}
+                strokeWidth={box.type === "human" ? 3 : 2} // Thicker stroke for human-modified boxes
                 fill={`${color}33`}
                 draggable={!isPlaying}
                 onClick={() => handleRectClick(box.id)}

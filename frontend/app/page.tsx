@@ -21,6 +21,32 @@ export default function VideoAnnotationEditor() {
   const [currentFrame, setCurrentFrame] = useState(0)
   const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+
+  const saveAnnotations = useCallback(async (data: AnnotationData) => {
+    if (isSaving) return // Prevent multiple simultaneous saves
+    
+    setIsSaving(true)
+    try {
+      const response = await fetch('/api/annotations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to save annotations')
+      }
+      
+      console.log('Annotations saved successfully')
+    } catch (error) {
+      console.error('Error saving annotations:', error)
+    } finally {
+      setIsSaving(false)
+    }
+  }, [isSaving])
 
   const handleJsonLoad = useCallback((data: AnnotationData) => {
     console.log('Loaded annotation data:', data)
@@ -37,18 +63,20 @@ export default function VideoAnnotationEditor() {
     (frameIndex: number, boxes: BoundingBox[]) => {
       if (!annotationData) return
 
-      setAnnotationData((prev) => {
-        if (!prev) return prev
-        return {
-          ...prev,
-          annotations: {
-            ...prev.annotations,
-            [frameIndex]: boxes,
-          },
-        }
-      })
+      const updatedData = {
+        ...annotationData,
+        annotations: {
+          ...annotationData.annotations,
+          [frameIndex]: boxes,
+        },
+      }
+
+      setAnnotationData(updatedData)
+      
+      // Save the updated data to the JSON file
+      saveAnnotations(updatedData)
     },
-    [annotationData],
+    [annotationData, saveAnnotations],
   )
 
   const currentBoundingBoxes = annotationData?.annotations[currentFrame] || []
@@ -61,6 +89,11 @@ export default function VideoAnnotationEditor() {
           <div className="lg:col-span-2 space-y-4">
             <Card className="bg-gray-800 border-gray-700 p-4">
               <div className="relative">
+                {isSaving && (
+                  <div className="absolute top-4 right-4 bg-blue-600 text-white px-3 py-1 rounded text-sm z-10">
+                    Saving...
+                  </div>
+                )}
                 <VideoPlayer
                   onVideoRef={setVideoElement}
                   onFrameChange={handleFrameChange}
@@ -154,6 +187,11 @@ export default function VideoAnnotationEditor() {
                           <div className="text-gray-400 text-xs">
                             Position: ({(box.x * 100).toFixed(1)}%, {(box.y * 100).toFixed(1)}%)
                           </div>
+                          <div className="text-gray-400 text-xs">
+                            Type: <span className={box.type === 'human' ? 'text-blue-400' : 'text-green-400'}>
+                              {box.type}
+                            </span>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -166,7 +204,12 @@ export default function VideoAnnotationEditor() {
             <Card className="bg-gray-800 border-gray-700 p-4">
               <h3 className="text-lg font-semibold mb-4">Detection Legend</h3>
               <div className="space-y-2 text-sm">
+              <div className="flex items-center space-x-2">
+                    <div className="w-3 h-3 bg-blue-400 rounded"></div>
+                    <span>Human-modified</span>
+                  </div>
                 <div className="flex items-center space-x-2">
+                  
                   <div className="w-3 h-3 bg-green-500 rounded"></div>
                   <span>High confidence (&gt;90%)</span>
                 </div>
@@ -177,6 +220,10 @@ export default function VideoAnnotationEditor() {
                 <div className="flex items-center space-x-2">
                   <div className="w-3 h-3 bg-red-500 rounded"></div>
                   <span>Low confidence (&lt;70%)</span>
+                </div>
+                <div className="mt-4 space-y-2">
+
+
                 </div>
               </div>
             </Card>
