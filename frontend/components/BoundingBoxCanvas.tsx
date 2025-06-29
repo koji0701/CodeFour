@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react"
-import { Stage, Layer, Rect, Transformer } from 'react-konva'
+import { Stage, Layer, Rect, Transformer, Group, Circle, Text, Line } from 'react-konva'
 import type { BoundingBox, VideoInfo } from "@/lib/types"
 
 interface BoundingBoxCanvasProps {
@@ -21,8 +21,9 @@ function BoundingBoxCanvas({
   onBoundingBoxUpdate,
 }: BoundingBoxCanvasProps) {
   const stageRef = useRef<any>(null)
-  const transformerRef = useRef<any>(null)
+  const transformerRefs = useRef<{[key: string]: any}>({})
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 })
   const [videoDisplayArea, setVideoDisplayArea] = useState({ 
     x: 0, 
@@ -88,17 +89,23 @@ function BoundingBoxCanvas({
   }, [videoElement, videoInfo])
 
   useEffect(() => {
-    if (transformerRef.current && selectedId) {
-      const stage = stageRef.current
-      if (stage) {
-        const selectedNode = stage.findOne(`#${selectedId}`)
-        if (selectedNode) {
-          transformerRef.current.nodes([selectedNode])
-          transformerRef.current.getLayer()?.batchDraw()
+    if (!isPlaying) {
+      // When paused, attach transformers to all boxes
+      boundingBoxes.forEach(box => {
+        const transformer = transformerRefs.current[box.id]
+        if (transformer) {
+          const stage = stageRef.current
+          if (stage) {
+            const node = stage.findOne(`#${box.id}`)
+            if (node) {
+              transformer.nodes([node])
+              transformer.getLayer()?.batchDraw()
+            }
+          }
         }
-      }
+      })
     }
-  }, [selectedId])
+  }, [isPlaying, boundingBoxes])
 
   const handleRectClick = (id: string) => {
     if (!isPlaying) {
@@ -112,38 +119,40 @@ function BoundingBoxCanvas({
     }
   }
 
-  const handleRectDragEnd = (id: string, e: any) => {
-    const rect = e.target
-    
-    const updatedBoxes = boundingBoxes.map((box) => {
-      if (box.id === id) {
-        // Convert back to normalized coordinates relative to video display area
-        const normalizedX = (rect.x() - videoDisplayArea.x) / videoDisplayArea.width
-        const normalizedY = (rect.y() - videoDisplayArea.y) / videoDisplayArea.height
-        
-        return {
-          ...box,
-          x: Math.max(0, Math.min(1, normalizedX)),
-          y: Math.max(0, Math.min(1, normalizedY)),
-          type: "human" as const,
-        }
-      }
-      return box
-    })
+  const handleMouseEnter = (id: string) => {
+    if (!isPlaying) {
+      setHoveredId(id)
+      document.body.style.cursor = 'move'
+    }
+  }
 
+  const handleMouseLeave = () => {
+    setHoveredId(null)
+    document.body.style.cursor = 'default'
+  }
+
+  const handleDeleteBox = (id: string) => {
+    const updatedBoxes = boundingBoxes.filter(box => box.id !== id)
     onBoundingBoxUpdate(updatedBoxes)
+    setHoveredId(null)
+    setSelectedId(null)
   }
 
   const handleRectTransform = (id: string, e: any) => {
     const rect = e.target
+    const group = rect.getParent()
     const scaleX = rect.scaleX()
     const scaleY = rect.scaleY()
 
     const updatedBoxes = boundingBoxes.map((box) => {
       if (box.id === id) {
+        // Get the group position and add rect position (which should be 0,0 but account for transforms)
+        const absoluteX = group.x() + rect.x()
+        const absoluteY = group.y() + rect.y()
+        
         // Convert back to normalized coordinates relative to video display area
-        const normalizedX = (rect.x() - videoDisplayArea.x) / videoDisplayArea.width
-        const normalizedY = (rect.y() - videoDisplayArea.y) / videoDisplayArea.height
+        const normalizedX = (absoluteX - videoDisplayArea.x) / videoDisplayArea.width
+        const normalizedY = (absoluteY - videoDisplayArea.y) / videoDisplayArea.height
         const normalizedWidth = (rect.width() * scaleX) / videoDisplayArea.width
         const normalizedHeight = (rect.height() * scaleY) / videoDisplayArea.height
         
@@ -158,6 +167,14 @@ function BoundingBoxCanvas({
       }
       return box
     })
+
+    // Update group position if rect was moved during transform
+    if (rect.x() !== 0 || rect.y() !== 0) {
+      group.x(group.x() + rect.x())
+      group.y(group.y() + rect.y())
+      rect.x(0)
+      rect.y(0)
+    }
 
     // Reset scale
     rect.scaleX(1)
@@ -208,29 +225,87 @@ function BoundingBoxCanvas({
             const color = getBoxColor(box.confidence, box.type)
 
             return (
-              <Rect
+              <Group 
                 key={box.id}
-                id={box.id}
                 x={pixelCoords.x}
                 y={pixelCoords.y}
-                width={pixelCoords.width}
-                height={pixelCoords.height}
-                stroke={color}
-                strokeWidth={box.type === "human" ? 3 : 2} // Thicker stroke for human-modified boxes
-                fill={`${color}33`}
                 draggable={!isPlaying}
-                onClick={() => handleRectClick(box.id)}
-                onTap={() => handleRectClick(box.id)}
-                onDragEnd={(e) => handleRectDragEnd(box.id, e)}
-                onTransformEnd={(e) => handleRectTransform(box.id, e)}
+                onDragEnd={(e) => {
+                  // Update the box position based on the group's new position
+                  const group = e.target
+                  const normalizedX = (group.x() - videoDisplayArea.x) / videoDisplayArea.width
+                  const normalizedY = (group.y() - videoDisplayArea.y) / videoDisplayArea.height
+                  
+                  const updatedBoxes = boundingBoxes.map((b) => {
+                    if (b.id === box.id) {
+                      return {
+                        ...b,
+                        x: Math.max(0, Math.min(1, normalizedX)),
+                        y: Math.max(0, Math.min(1, normalizedY)),
+                        type: "human" as const,
+                      }
+                    }
+                    return b
+                  })
+                  onBoundingBoxUpdate(updatedBoxes)
+                }}
+                onMouseEnter={() => handleMouseEnter(box.id)}
+                onMouseLeave={handleMouseLeave}
                 listening={!isPlaying}
-              />
+              >
+                <Rect
+                  id={box.id}
+                  x={0}
+                  y={0}
+                  width={pixelCoords.width}
+                  height={pixelCoords.height}
+                  stroke={color}
+                  strokeWidth={box.type === "human" ? 3 : 2} // Thicker stroke for human-modified boxes
+                  fill={`${color}33`}
+                  onClick={() => handleRectClick(box.id)}
+                  onTap={() => handleRectClick(box.id)}
+                  onTransformEnd={(e) => handleRectTransform(box.id, e)}
+                />
+                
+                {/* Delete X button on hover */}
+                {hoveredId === box.id && !isPlaying && (
+                  <Group
+                    x={pixelCoords.width / 2}
+                    y={pixelCoords.height / 2}
+                    onClick={() => handleDeleteBox(box.id)}
+                    onTap={() => handleDeleteBox(box.id)}
+                  >
+                    <Circle
+                      radius={10}
+                      fill="rgba(0, 0, 0, 0.7)"
+                      stroke="white"
+                      strokeWidth={1}
+                    />
+                    <Text
+                      text="×"
+                      fontSize={16}
+                      fontStyle="bold"
+                      fill="white"
+                      x={-5}
+                      y={-8}
+                    />
+                  </Group>
+                )}
+              </Group>
             )
           })}
 
-          {selectedId && !isPlaying && (
+          {/* Individual transformers for each box when paused */}
+          {!isPlaying && boundingBoxes.map((box) => (
             <Transformer
-              ref={transformerRef}
+              key={`transformer-${box.id}`}
+              ref={(el) => {
+                if (el) {
+                  transformerRefs.current[box.id] = el
+                } else {
+                  delete transformerRefs.current[box.id]
+                }
+              }}
               boundBoxFunc={(oldBox, newBox) => {
                 // Limit resize
                 if (newBox.width < 10 || newBox.height < 10) {
@@ -238,9 +313,21 @@ function BoundingBoxCanvas({
                 }
                 return newBox
               }}
-              enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right']}
+              enabledAnchors={[
+                'top-left', 'top-center', 'top-right',
+                'middle-left', 'middle-right',
+                'bottom-left', 'bottom-center', 'bottom-right'
+              ]}
+              // Customize the corner handles to be white circles
+              anchorFill="white"
+              anchorStroke="#3b82f6"
+              anchorStrokeWidth={2}
+              anchorSize={8}
+              anchorCornerRadius={4}
+              borderEnabled={false}
+              rotateEnabled={false}
             />
-          )}
+          ))}
         </Layer>
       </Stage>
     </div>
