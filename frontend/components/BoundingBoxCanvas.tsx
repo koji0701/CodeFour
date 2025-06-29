@@ -10,6 +10,10 @@ interface BoundingBoxCanvasProps {
   videoInfo: VideoInfo
   /** Whether the video is currently playing. Used to disable dragging while playing */
   isPlaying: boolean
+  /** Whether we are currently in add-bounding-box mode */
+  isAddMode: boolean
+  /** Callback once a new box has been successfully added (or cancelled) */
+  onAddComplete: () => void
   onBoundingBoxUpdate: (boxes: BoundingBox[]) => void
 }
 
@@ -18,6 +22,8 @@ function BoundingBoxCanvas({
   boundingBoxes,
   videoInfo,
   isPlaying,
+  isAddMode,
+  onAddComplete,
   onBoundingBoxUpdate,
 }: BoundingBoxCanvasProps) {
   const stageRef = useRef<any>(null)
@@ -33,6 +39,9 @@ function BoundingBoxCanvas({
     scaleX: 1,
     scaleY: 1
   })
+  // State for drawing a new bounding box
+  const [drawStart, setDrawStart] = useState<{x: number; y: number} | null>(null)
+  const [drawEnd, setDrawEnd] = useState<{x: number; y: number} | null>(null)
 
   // Calculate the actual video display area within the video element
   const calculateVideoDisplayArea = () => {
@@ -205,6 +214,74 @@ function BoundingBoxCanvas({
     return "#ef4444" // red
   }
 
+  // Utility to convert pixel coords to normalized relative to video display area
+  const pixelToNormalized = (x: number, y: number) => {
+    return {
+      x: (x - videoDisplayArea.x) / videoDisplayArea.width,
+      y: (y - videoDisplayArea.y) / videoDisplayArea.height,
+    }
+  }
+
+  const handleStageMouseDown = (e: any) => {
+    if (!isAddMode || isPlaying) return
+    const pointerPos = e.target.getStage().getPointerPosition()
+    if (!pointerPos) return
+    setDrawStart(pointerPos)
+    setDrawEnd(pointerPos)
+  }
+
+  const handleStageMouseMove = (e: any) => {
+    if (!isAddMode || !drawStart) return
+    const pointerPos = e.target.getStage().getPointerPosition()
+    if (!pointerPos) return
+    setDrawEnd(pointerPos)
+  }
+
+  const handleStageMouseUp = () => {
+    if (!isAddMode || !drawStart || !drawEnd) {
+      setDrawStart(null)
+      setDrawEnd(null)
+      return
+    }
+
+    // Compute rect with start and end
+    const startX = Math.min(drawStart.x, drawEnd.x)
+    const startY = Math.min(drawStart.y, drawEnd.y)
+    const endX = Math.max(drawStart.x, drawEnd.x)
+    const endY = Math.max(drawStart.y, drawEnd.y)
+
+    // Convert to normalized
+    const normStart = pixelToNormalized(startX, startY)
+    const normEnd = pixelToNormalized(endX, endY)
+
+    let newX = Math.max(0, normStart.x)
+    let newY = Math.max(0, normStart.y)
+    let newWidth = normEnd.x - normStart.x
+    let newHeight = normEnd.y - normStart.y
+
+    // Basic sanity threshold (at least 1% of width/height)
+    if (newWidth > 0.01 && newHeight > 0.01) {
+      const newBox: BoundingBox = {
+        id: `box-${Date.now()}`,
+        x: newX,
+        y: newY,
+        width: Math.min(1 - newX, newWidth),
+        height: Math.min(1 - newY, newHeight),
+        confidence: 1,
+        type: "human",
+        class: "manual",
+      }
+      onBoundingBoxUpdate([...boundingBoxes, newBox])
+    }
+
+    // Reset drawing state
+    setDrawStart(null)
+    setDrawEnd(null)
+
+    // Inform parent regardless of success
+    onAddComplete()
+  }
+
   if (stageSize.width === 0 || stageSize.height === 0 || videoDisplayArea.width === 0) {
     return null
   }
@@ -216,8 +293,11 @@ function BoundingBoxCanvas({
         width={stageSize.width}
         height={stageSize.height}
         onClick={handleStageClick}
+        onMouseDown={handleStageMouseDown}
+        onMouseMove={handleStageMouseMove}
+        onMouseUp={handleStageMouseUp}
         className={isPlaying ? "pointer-events-none" : "pointer-events-auto"}
-        style={{ pointerEvents: isPlaying ? 'none' : 'auto' }}
+        style={{ pointerEvents: isPlaying ? 'none' : 'auto', cursor: isAddMode ? 'crosshair' : undefined }}
       >
         <Layer>
           {boundingBoxes.map((box) => {
@@ -229,7 +309,7 @@ function BoundingBoxCanvas({
                 key={box.id}
                 x={pixelCoords.x}
                 y={pixelCoords.y}
-                draggable={!isPlaying}
+                draggable={!isPlaying && !isAddMode}
                 onDragEnd={(e) => {
                   // Update the box position based on the group's new position
                   const group = e.target
@@ -249,9 +329,9 @@ function BoundingBoxCanvas({
                   })
                   onBoundingBoxUpdate(updatedBoxes)
                 }}
-                onMouseEnter={() => handleMouseEnter(box.id)}
+                onMouseEnter={() => !isAddMode && handleMouseEnter(box.id)}
                 onMouseLeave={handleMouseLeave}
-                listening={!isPlaying}
+                listening={!isPlaying && !isAddMode}
               >
                 <Rect
                   id={box.id}
@@ -296,7 +376,7 @@ function BoundingBoxCanvas({
           })}
 
           {/* Individual transformers for each box when paused */}
-          {!isPlaying && boundingBoxes.map((box) => (
+          {!isPlaying && !isAddMode && boundingBoxes.map((box) => (
             <Transformer
               key={`transformer-${box.id}`}
               ref={(el) => {
@@ -328,6 +408,18 @@ function BoundingBoxCanvas({
               rotateEnabled={false}
             />
           ))}
+
+          {/* Preview rectangle while drawing */}
+          {isAddMode && drawStart && drawEnd && (
+            <Rect
+              x={Math.min(drawStart.x, drawEnd.x)}
+              y={Math.min(drawStart.y, drawEnd.y)}
+              width={Math.abs(drawEnd.x - drawStart.x)}
+              height={Math.abs(drawEnd.y - drawStart.y)}
+              stroke="#3b82f6"
+              dash={[4, 4]}
+            />
+          )}
         </Layer>
       </Stage>
     </div>

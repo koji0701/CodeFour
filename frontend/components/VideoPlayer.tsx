@@ -12,6 +12,10 @@ interface VideoPlayerProps {
   onFrameChange: (frame: number) => void
   onPlayStateChange: (isPlaying: boolean) => void
   annotationData: AnnotationData | null
+  /** Whether we are currently in "add bounding box" mode */
+  isAddMode: boolean
+  /** Toggle the add-mode on / off */
+  onToggleAddMode: () => void
 }
 
 export default function VideoPlayer({
@@ -19,6 +23,8 @@ export default function VideoPlayer({
   onFrameChange,
   onPlayStateChange,
   annotationData,
+  isAddMode,
+  onToggleAddMode,
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const frameByFrameIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -292,46 +298,66 @@ export default function VideoPlayer({
       <Card className="bg-gray-800 border-gray-700 p-4">
         <div className="space-y-4">
           {/* Main Controls */}
-          <div className="flex items-center justify-center space-x-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => stepFrame("backward")}
-              className="bg-gray-700 border-gray-600 hover:bg-gray-600"
-            >
-              <SkipBack className="w-4 h-4" />
-            </Button>
+          <div className="flex items-center justify-between">
+            {/* Left control cluster */}
+            <div className="flex items-center space-x-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => stepFrame("backward")}
+                className="bg-gray-700 border-gray-600 hover:bg-gray-600"
+              >
+                <SkipBack className="w-4 h-4" />
+              </Button>
 
-            <Button
-              variant="outline"
-              onClick={togglePlayPause}
-              className="bg-gray-700 border-gray-600 hover:bg-gray-600"
-            >
-              {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-            </Button>
+              <Button
+                variant="outline"
+                onClick={togglePlayPause}
+                className="bg-gray-700 border-gray-600 hover:bg-gray-600"
+              >
+                {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+              </Button>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => stepFrame("forward")}
-              className="bg-gray-700 border-gray-600 hover:bg-gray-600"
-            >
-              <SkipForward className="w-4 h-4" />
-            </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => stepFrame("forward")}
+                className="bg-gray-700 border-gray-600 hover:bg-gray-600"
+              >
+                <SkipForward className="w-4 h-4" />
+              </Button>
 
-            <Button
-              variant={isFrameByFrameMode ? "default" : "outline"}
-              size="sm"
-              onClick={toggleFrameByFrameMode}
-              className={
-                isFrameByFrameMode
-                  ? "bg-blue-600 border-blue-500 hover:bg-blue-700"
-                  : "bg-gray-700 border-gray-600 hover:bg-gray-600"
-              }
-              title="Frame-by-frame playback"
-            >
-              <Timer className="w-4 h-4" />
-            </Button>
+              <Button
+                variant={isFrameByFrameMode ? "default" : "outline"}
+                size="sm"
+                onClick={toggleFrameByFrameMode}
+                className={
+                  isFrameByFrameMode
+                    ? "bg-blue-600 border-blue-500 hover:bg-blue-700"
+                    : "bg-gray-700 border-gray-600 hover:bg-gray-600"
+                }
+                title="Frame-by-frame playback"
+              >
+                <Timer className="w-4 h-4" />
+              </Button>
+            </div>
+
+            {/* Add bounding box button (appears when paused) */}
+            {!isPlaying && (
+              <Button
+                variant={isAddMode ? "default" : "outline"}
+                size="sm"
+                onClick={onToggleAddMode}
+                className={
+                  isAddMode
+                    ? "bg-red-600 border-red-500 hover:bg-red-700"
+                    : "bg-gray-700 border-gray-600 hover:bg-gray-600"
+                }
+                title={isAddMode ? "Cancel add box" : "Add bounding box"}
+              >
+                {isAddMode ? <span className="font-bold">×</span> : <span className="font-bold">＋</span>}
+              </Button>
+            )}
           </div>
 
           {/* Timeline Scrubber */}

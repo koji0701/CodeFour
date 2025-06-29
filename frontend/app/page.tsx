@@ -22,6 +22,7 @@ export default function VideoAnnotationEditor() {
   const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isAddMode, setIsAddMode] = useState(false)
 
   const saveAnnotations = useCallback(async (data: AnnotationData) => {
     if (isSaving) return // Prevent multiple simultaneous saves
@@ -81,6 +82,21 @@ export default function VideoAnnotationEditor() {
 
   const currentBoundingBoxes = annotationData?.annotations[currentFrame] || []
 
+  // Toggle add mode – ensure video is paused before allowing
+  const toggleAddMode = useCallback(() => {
+    // If video is playing, ignore
+    if (isPlaying) return
+    setIsAddMode((prev) => {
+      // Reset cursor when turning off
+      if (prev) {
+        document.body.style.cursor = "default"
+      } else {
+        document.body.style.cursor = "crosshair"
+      }
+      return !prev
+    })
+  }, [isPlaying])
+
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100">
       <div className="container mx-auto p-6">
@@ -99,17 +115,24 @@ export default function VideoAnnotationEditor() {
                   onFrameChange={handleFrameChange}
                   onPlayStateChange={setIsPlaying}
                   annotationData={annotationData}
+                  isAddMode={isAddMode}
+                  onToggleAddMode={toggleAddMode}
                 />
-                {videoElement && annotationData && currentBoundingBoxes.length > 0 && (
+                {videoElement && annotationData && (
                   <BoundingBoxCanvas
                     videoElement={videoElement}
                     boundingBoxes={currentBoundingBoxes}
                     videoInfo={annotationData.video_info}
                     isPlaying={isPlaying}
+                    isAddMode={isAddMode}
+                    onAddComplete={() => {
+                      setIsAddMode(false)
+                      document.body.style.cursor = "default"
+                    }}
                     onBoundingBoxUpdate={(boxes) => handleBoundingBoxUpdate(currentFrame, boxes)}
                   />
                 )}
-                {videoElement && annotationData && currentBoundingBoxes.length === 0 && (
+                {videoElement && annotationData && currentBoundingBoxes.length === 0 && !isAddMode && (
                   <div className="absolute top-4 left-4 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
                     No detections for frame {currentFrame}
                   </div>
