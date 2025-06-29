@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import VideoPlayer, { VideoPlayerHandle } from "@/components/VideoPlayer"
 import type { AnnotationData, BoundingBox } from "@/lib/types"
+import { UndoRedoManager, type UndoRedoAction } from "@/lib/undoRedoManager"
 import dynamic from "next/dynamic"
 import { Checkbox } from "@/components/ui/checkbox"
 
@@ -35,6 +36,17 @@ export default function VideoAnnotationEditor() {
   const [frameCountInput, setFrameCountInput] = useState("")
   const [pendingBox, setPendingBox] = useState<BoundingBox | null>(null)
   const videoPlayerRef = useRef<VideoPlayerHandle | null>(null)
+  
+  // Undo/Redo management
+  const undoRedoManagerRef = useRef<UndoRedoManager>(new UndoRedoManager())
+  const [canUndo, setCanUndo] = useState(false)
+  const [canRedo, setCanRedo] = useState(false)
+
+  // Helper to update undo/redo state
+  const updateUndoRedoState = useCallback(() => {
+    setCanUndo(undoRedoManagerRef.current.canUndo())
+    setCanRedo(undoRedoManagerRef.current.canRedo())
+  }, [])
 
   // Load resolved frames from localStorage on mount
   useEffect(() => {
@@ -128,8 +140,24 @@ export default function VideoAnnotationEditor() {
   }, [])
 
   const handleBoundingBoxUpdate = useCallback(
-    (frameIndex: number, boxes: BoundingBox[]) => {
+    (frameIndex: number, boxes: BoundingBox[], skipUndoRecord = false) => {
       if (!annotationData) return
+
+      const beforeState = annotationData.annotations[frameIndex] || []
+      
+      // Record undo action if not skipping (e.g., during undo/redo)
+      if (!skipUndoRecord) {
+        const actionType = beforeState.length === 0 ? 'add' : 
+                         boxes.length === 0 ? 'delete' : 'edit'
+        
+        undoRedoManagerRef.current.recordSingleFrameAction(
+          actionType,
+          frameIndex,
+          beforeState,
+          boxes
+        )
+        updateUndoRedoState()
+      }
 
       const updatedData = {
         ...annotationData,
@@ -144,15 +172,19 @@ export default function VideoAnnotationEditor() {
       // Save the updated data to the JSON file
       saveAnnotations(updatedData)
     },
-    [annotationData, saveAnnotations],
+    [annotationData, saveAnnotations, updateUndoRedoState],
   )
 
   const handleMultiFrameBoundingBoxUpdate = useCallback(
-    (startFrame: number, frameCount: number, newBox: BoundingBox) => {
+    (startFrame: number, frameCount: number, newBox: BoundingBox, skipUndoRecord = false) => {
       if (!annotationData) return
 
       const maxFrame = annotationData.video_info.frame_count - 1
       const endFrame = Math.min(startFrame + frameCount - 1, maxFrame)
+      
+      const affectedFrames = []
+      const beforeStates: Record<number, BoundingBox[]> = {}
+      const afterStates: Record<number, BoundingBox[]> = {}
       
       const updatedAnnotations = { ...annotationData.annotations }
       
@@ -163,7 +195,23 @@ export default function VideoAnnotationEditor() {
           ...newBox,
           id: `${newBox.id}_f${frame}`, // Make ID unique per frame
         }
+        
+        affectedFrames.push(frame)
+        beforeStates[frame] = [...existingBoxes]
+        afterStates[frame] = [...existingBoxes, boxWithUniqueId]
+        
         updatedAnnotations[frame] = [...existingBoxes, boxWithUniqueId]
+      }
+
+      // Record undo action if not skipping
+      if (!skipUndoRecord) {
+        undoRedoManagerRef.current.recordMultiFrameAction(
+          startFrame,
+          affectedFrames,
+          beforeStates,
+          afterStates
+        )
+        updateUndoRedoState()
       }
 
       const updatedData = {
@@ -176,7 +224,7 @@ export default function VideoAnnotationEditor() {
       // Save the updated data to the JSON file
       saveAnnotations(updatedData)
     },
-    [annotationData, saveAnnotations],
+    [annotationData, saveAnnotations, updateUndoRedoState],
   )
 
   // Handle multi-frame modal
@@ -226,6 +274,91 @@ export default function VideoAnnotationEditor() {
       return !prev
     })
   }, [isPlaying])
+
+  // Undo/Redo handlers
+  const handleUndo = useCallback(() => {
+    if (isPlaying || !annotationData) return
+    
+    const result = undoRedoManagerRef.current.undo()
+    if (!result) return
+
+    const { action, targetFrame } = result
+
+    if (action.type === 'multi-add') {
+      // Multi-frame action - restore all affected frames
+      if (action.beforeStates) {
+        const updatedAnnotations = { ...annotationData.annotations }
+        
+        for (const [frameStr, beforeState] of Object.entries(action.beforeStates)) {
+          const frame = parseInt(frameStr, 10)
+          updatedAnnotations[frame] = beforeState
+        }
+
+        const updatedData = {
+          ...annotationData,
+          annotations: updatedAnnotations,
+        }
+
+        setAnnotationData(updatedData)
+        saveAnnotations(updatedData)
+      }
+    } else {
+      // Single-frame action
+      if (action.beforeState) {
+        handleBoundingBoxUpdate(action.frame, action.beforeState, true) // skipUndoRecord = true
+      }
+    }
+
+    // Jump to the frame where the action occurred
+    setCurrentFrame(targetFrame)
+    if (videoPlayerRef.current) {
+      videoPlayerRef.current.enterFrameByFrameAt(targetFrame)
+    }
+
+    updateUndoRedoState()
+  }, [isPlaying, annotationData, handleBoundingBoxUpdate, saveAnnotations, updateUndoRedoState])
+
+  const handleRedo = useCallback(() => {
+    if (isPlaying || !annotationData) return
+    
+    const result = undoRedoManagerRef.current.redo()
+    if (!result) return
+
+    const { action, targetFrame } = result
+
+    if (action.type === 'multi-add') {
+      // Multi-frame action - restore all affected frames
+      if (action.afterStates) {
+        const updatedAnnotations = { ...annotationData.annotations }
+        
+        for (const [frameStr, afterState] of Object.entries(action.afterStates)) {
+          const frame = parseInt(frameStr, 10)
+          updatedAnnotations[frame] = afterState
+        }
+
+        const updatedData = {
+          ...annotationData,
+          annotations: updatedAnnotations,
+        }
+
+        setAnnotationData(updatedData)
+        saveAnnotations(updatedData)
+      }
+    } else {
+      // Single-frame action
+      if (action.afterState) {
+        handleBoundingBoxUpdate(action.frame, action.afterState, true) // skipUndoRecord = true
+      }
+    }
+
+    // Jump to the frame where the action occurred
+    setCurrentFrame(targetFrame)
+    if (videoPlayerRef.current) {
+      videoPlayerRef.current.enterFrameByFrameAt(targetFrame)
+    }
+
+    updateUndoRedoState()
+  }, [isPlaying, annotationData, handleBoundingBoxUpdate, saveAnnotations, updateUndoRedoState])
 
   // Compute flagged frames based on object count deviations and low confidence objects
   const getFlaggedFrames = useCallback(() => {
@@ -335,6 +468,10 @@ export default function VideoAnnotationEditor() {
                   onToggleAddMode={toggleAddMode}
                   addBoxMode={addBoxMode}
                   onAddBoxModeChange={setAddBoxMode}
+                  canUndo={canUndo}
+                  canRedo={canRedo}
+                  onUndo={handleUndo}
+                  onRedo={handleRedo}
                 />
                 {videoElement && annotationData && (
                   <BoundingBoxCanvas

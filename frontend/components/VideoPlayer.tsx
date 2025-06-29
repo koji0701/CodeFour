@@ -18,7 +18,7 @@ import {
   DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu"
 import { TimelineScrubber } from "@/components/TimelineScrubber"
-import { Play, Pause, SkipBack, SkipForward, Timer, Plus, Copy, ChevronDown } from "lucide-react"
+import { Play, Pause, SkipBack, SkipForward, Timer, Plus, Copy, ChevronDown, Undo, Redo } from "lucide-react"
 import type { AnnotationData } from "@/lib/types"
 
 interface VideoPlayerProps {
@@ -33,6 +33,11 @@ interface VideoPlayerProps {
   /** Multi-frame mode settings */
   addBoxMode: "single" | "multi"
   onAddBoxModeChange: (mode: "single" | "multi") => void
+  /** Undo/Redo functionality */
+  canUndo: boolean
+  canRedo: boolean
+  onUndo: () => void
+  onRedo: () => void
 }
 
 export interface VideoPlayerHandle {
@@ -49,6 +54,10 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
   onToggleAddMode,
   addBoxMode,
   onAddBoxModeChange,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
 }: VideoPlayerProps, ref) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const frameByFrameIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -298,6 +307,26 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
             return;
         }
 
+        // Handle Cmd+Z/Ctrl+Z (undo) and Cmd+Y/Ctrl+Y (redo)
+        const isMac = navigator.platform.includes('Mac');
+        const modifierKey = isMac ? event.metaKey : event.ctrlKey;
+        
+        if (modifierKey && event.key === "z" && !event.shiftKey) {
+            event.preventDefault();
+            if (!isPlaying && canUndo) {
+                onUndo();
+            }
+            return;
+        }
+        
+        if (modifierKey && (event.key === "y" || (event.key === "z" && event.shiftKey))) {
+            event.preventDefault();
+            if (!isPlaying && canRedo) {
+                onRedo();
+            }
+            return;
+        }
+
         switch (event.key) {
             case " ":
                 event.preventDefault(); // Prevent page scroll
@@ -330,7 +359,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
     return () => {
         window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [togglePlayPause, stepFrame, toggleFrameByFrameMode]);
+  }, [togglePlayPause, stepFrame, toggleFrameByFrameMode, isPlaying, canUndo, canRedo, onUndo, onRedo]);
 
   const handleSliderChange = useCallback(
     (value: number[]) => {
@@ -476,8 +505,45 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
                 </Tooltip>
               </div>
               
-              {/* Add bounding box button with dropdown (disabled when playing) */}
-              <div className="flex items-center">
+              {/* Right control cluster: Undo/Redo + Add bounding box */}
+              <div className="flex items-center space-x-2">
+                {/* Undo button */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={onUndo}
+                      disabled={isPlaying || !canUndo}
+                      className="bg-gray-700 border-gray-600 hover:bg-gray-600 disabled:bg-gray-500 disabled:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Undo className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{isPlaying ? "Pause video to undo" : canUndo ? `Undo (${navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl'}+Z)` : "No actions to undo"}</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                {/* Redo button */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={onRedo}
+                      disabled={isPlaying || !canRedo}
+                      className="bg-gray-700 border-gray-600 hover:bg-gray-600 disabled:bg-gray-500 disabled:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Redo className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{isPlaying ? "Pause video to redo" : canRedo ? `Redo (${navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl'}+Y)` : "No actions to redo"}</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                {/* Add bounding box button with dropdown */}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div className="relative flex">
