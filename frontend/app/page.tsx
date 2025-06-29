@@ -634,156 +634,157 @@ export default function VideoAnnotationEditor() {
                     <TabsTrigger value="group-boxes" className="tabs-trigger-enhanced">Group Boxes</TabsTrigger>
                     <TabsTrigger value="flagged-frames" className="tabs-trigger-enhanced">Flagged Frames</TabsTrigger>
                   </TabsList>
-                  
-                  <TabsContent value="group-boxes" className="mt-4 flex-1 overflow-hidden flex flex-col">
-                    <div className="space-y-4 text-sm flex-1 flex flex-col min-h-0">
-                      {isGroupingMode && (
-                        <div className="mb-4">
-                          <Button
-                            onClick={handleFinishGrouping}
-                            disabled={selectedBoxesForGrouping.length === 0}
-                            className="w-full bg-green-600 hover:bg-green-700 text-white"
-                          >
-                            Finish Grouping ({selectedBoxesForGrouping.length} boxes selected)
-                          </Button>
-                          {currentGroupName && (
-                            <p className="text-center mt-2 text-muted-foreground">
-                              Grouping as: <span className="font-semibold text-orange-500">{currentGroupName}</span>
-                            </p>
-                          )}
-                        </div>
-                      )}
-                      
-                      {selectedBoxesForGrouping.length === 0 ? (
-                        <div className="text-muted-foreground text-center py-8">
-                          {isGroupingMode 
-                            ? "Click on boxes to add them to the group"
-                            : "No boxes selected for grouping"
-                          }
-                        </div>
-                      ) : (
-                        <>
-                          <div className="info-label">
-                            {selectedBoxesForGrouping.length} box{selectedBoxesForGrouping.length > 1 ? 'es' : ''} selected
-                          </div>
-                          <div className="flex-1 overflow-y-auto space-y-3 min-h-0">
-                            {selectedBoxesForGrouping
-                              .sort((a, b) => a.frame - b.frame)
-                              .map((groupedBox) => (
-                                <div
-                                  key={`${groupedBox.frame}-${groupedBox.boxId}`}
-                                  className="flagged-frame-item flex items-center text-xs"
-                                  onClick={() => {
-                                    videoPlayerRef.current?.enterFrameByFrameAt(groupedBox.frame)
-                                  }}
-                                >
-                                  <div className="flex-1 space-y-1">
-                                    <div className="detection-value">
-                                      Frame {groupedBox.frame} - Box {groupedBox.boxId}
-                                    </div>
-                                    <div className="detection-label">
-                                      Confidence: {(groupedBox.box.confidence * 100).toFixed(1)}%
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                          </div>
-                        </>
-                      )}
+                  <TabsContent value="group-boxes" className="mt-4 overflow-hidden">
+  <div className="h-full flex flex-col text-sm">
+    {isGroupingMode && (
+      <div className="mb-4 flex-shrink-0">
+        <Button
+          onClick={handleFinishGrouping}
+          disabled={selectedBoxesForGrouping.length === 0}
+          className="w-full bg-green-600 hover:bg-green-700 text-white"
+        >
+          Finish Grouping ({selectedBoxesForGrouping.length} boxes selected)
+        </Button>
+        {currentGroupName && (
+          <p className="text-center mt-2 text-muted-foreground">
+            Grouping as: <span className="font-semibold text-orange-500">{currentGroupName}</span>
+          </p>
+        )}
+      </div>
+    )}
+    
+    {selectedBoxesForGrouping.length === 0 ? (
+      <div className="text-muted-foreground text-center py-8">
+        {isGroupingMode 
+          ? "Click on boxes to add them to the group"
+          : "No boxes selected for grouping"
+        }
+      </div>
+    ) : (
+      <>
+        <div className="info-label mb-2 flex-shrink-0">
+          {selectedBoxesForGrouping.length} box{selectedBoxesForGrouping.length > 1 ? 'es' : ''} selected
+        </div>
+        <div className="flex-1 overflow-y-auto pr-1 min-h-0">
+          <div className="space-y-2">
+            {selectedBoxesForGrouping
+              .sort((a, b) => a.frame - b.frame)
+              .map((groupedBox) => (
+                <div
+                  key={`${groupedBox.frame}-${groupedBox.boxId}`}
+                  className="flagged-frame-item flex items-center text-xs cursor-pointer hover:bg-muted/50 rounded p-2 transition-colors"
+                  onClick={() => {
+                    videoPlayerRef.current?.enterFrameByFrameAt(groupedBox.frame)
+                  }}
+                >
+                  <div className="flex-1 space-y-1">
+                    <div className="detection-value">
+                      Frame {groupedBox.frame} - Box {groupedBox.boxId}
                     </div>
-                  </TabsContent>
-                  
-                  <TabsContent value="current-frame" className="mt-4 flex-1 overflow-y-auto">
-                    <div className="space-y-4 text-sm h-full">
-                      <div className="video-info-grid">
-                        <div className="video-info-item">
-                          <span className="info-label">Frame: </span>
-                          <span className="info-value">{currentFrame}</span>
-                        </div>
-                        <div className="video-info-item">
-                          <span className="info-label">Detections: </span>
-                          <span className="info-value">{currentBoundingBoxes.length}</span>
-                        </div>
-                        <div className="video-info-item">
-                          <span className="info-label">Playing: </span>
-                          <span className="info-value">{isPlaying ? 'Yes' : 'No'}</span>
-                        </div>
-                      </div>
-                      
-                      {currentBoundingBoxes.length > 0 && (
-                        <div className="mt-4 space-y-3">
-                          <span className="info-label">Object Detections:</span>
-                          <div className="flex-1 min-h-0 overflow-y-auto space-y-3">
-                          {currentBoundingBoxes.map((box, index) => (
-                              <div key={box.id} className="detection-item">
-                                <div className="detection-value font-semibold mb-2">{box.id}</div>
-                                <div className="detection-label">
-                                  Confidence: <span className="detection-value">{(box.confidence * 100).toFixed(1)}%</span>
-                                </div>
-                                <div className="detection-label">
-                                  Position: <span className="detection-value">({(box.x * 100).toFixed(1)}%, {(box.y * 100).toFixed(1)}%)</span>
-                                </div>
-                                <div className="detection-label">
-                                  Type: <span className={box.type === 'human' ? 'text-accent' : 'text-secondary'}>
-                                    {box.type}
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                    <div className="detection-label">
+                      Confidence: {(groupedBox.box.confidence * 100).toFixed(1)}%
                     </div>
-                  </TabsContent>
-                  
-                  <TabsContent value="flagged-frames" className="mt-4 flex-1 overflow-y-auto">
-                    <div className="space-y-4 text-sm h-full">
-                      {flaggedFrames.length === 0 ? (
-                        <div className="text-muted-foreground text-center py-8">
-                          No flagged frames found
-                        </div>
-                      ) : (
-                        <>
-                          <div className="info-label">
-                            {flaggedFrames.length} frame{flaggedFrames.length > 1 ? 's' : ''} flagged
-                          </div>
-                          <div className="max-h-64 overflow-y-auto space-y-3">
-                            {flaggedFrames.map((flagged) => (
-                              <div
-                                key={flagged.frame}
-                                className="flagged-frame-item flex items-center text-xs"
-                                onClick={() => {
-                                  videoPlayerRef.current?.enterFrameByFrameAt(flagged.frame)
-                                }}
-                              >
-                                <Checkbox
-                                  className="mr-3"
-                                  onClick={(e) => e.stopPropagation()}
-                                  onCheckedChange={(checked) => {
-                                    setResolvedFrames((prev) => {
-                                      const next = new Map(prev)
-                                      if (checked) {
-                                        next.set(flagged.frame, flagged.faceCount)
-                                      } else {
-                                        next.delete(flagged.frame)
-                                      }
-                                      return next
-                                    })
-                                  }}
-                                />
-                                <div className="flex-1 space-y-1">
-                                  <div className="detection-value">Frame {flagged.frame}, {flagged.faceCount} object{flagged.faceCount !== 1 ? 's' : ''}</div>
-                                  {flagged.reason && (
-                                    <div className="detection-label">{flagged.reason}</div>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </TabsContent>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      </>
+    )}
+  </div>
+</TabsContent>
+                  <TabsContent value="current-frame" className="mt-4 overflow-y-auto">
+  <div className="space-y-4 text-sm">
+    <div className="video-info-grid">
+      <div className="video-info-item">
+        <span className="info-label">Frame: </span>
+        <span className="info-value">{currentFrame}</span>
+      </div>
+      <div className="video-info-item">
+        <span className="info-label">Detections: </span>
+        <span className="info-value">{currentBoundingBoxes.length}</span>
+      </div>
+      <div className="video-info-item">
+        <span className="info-label">Playing: </span>
+        <span className="info-value">{isPlaying ? 'Yes' : 'No'}</span>
+      </div>
+    </div>
+    
+    {currentBoundingBoxes.length > 0 && (
+      <>
+        <span className="info-label">Object Detections:</span>
+        <div className="space-y-3">
+          {currentBoundingBoxes.map((box, index) => (
+            <div key={box.id} className="detection-item">
+              <div className="detection-value font-semibold mb-2">{box.id}</div>
+              <div className="detection-label">
+                Confidence: <span className="detection-value">{(box.confidence * 100).toFixed(1)}%</span>
+              </div>
+              <div className="detection-label">
+                Position: <span className="detection-value">({(box.x * 100).toFixed(1)}%, {(box.y * 100).toFixed(1)}%)</span>
+              </div>
+              <div className="detection-label">
+                Type: <span className={box.type === 'human' ? 'text-accent' : 'text-secondary'}>
+                  {box.type}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </>
+    )}
+  </div>
+</TabsContent>
+
+<TabsContent value="flagged-frames" className="mt-4 overflow-y-auto">
+  <div className="text-sm">
+    {flaggedFrames.length === 0 ? (
+      <div className="text-muted-foreground text-center py-8">
+        No flagged frames found
+      </div>
+    ) : (
+      <div className="space-y-4">
+        <div className="info-label">
+          {flaggedFrames.length} frame{flaggedFrames.length > 1 ? 's' : ''} flagged
+        </div>
+        <div className="space-y-2">
+          {flaggedFrames.map((flagged) => (
+            <div
+              key={flagged.frame}
+              className="flagged-frame-item flex items-center text-xs cursor-pointer hover:bg-muted/50 rounded p-2 transition-colors"
+              onClick={() => {
+                videoPlayerRef.current?.enterFrameByFrameAt(flagged.frame)
+              }}
+            >
+              <Checkbox
+                className="mr-3 flex-shrink-0"
+                checked={resolvedFrames.has(flagged.frame)}
+                onClick={(e) => e.stopPropagation()}
+                onCheckedChange={(checked) => {
+                  setResolvedFrames((prev) => {
+                    const next = new Map(prev)
+                    if (checked) {
+                      next.set(flagged.frame, flagged.faceCount)
+                    } else {
+                      next.delete(flagged.frame)
+                    }
+                    return next
+                  })
+                }}
+              />
+              <div className="flex-1 space-y-1">
+                <div className="detection-value">Frame {flagged.frame}, {flagged.faceCount} object{flagged.faceCount !== 1 ? 's' : ''}</div>
+                {flagged.reason && (
+                  <div className="detection-label">{flagged.reason}</div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
+</TabsContent>
                 </Tabs>
               </Card>
             )}
