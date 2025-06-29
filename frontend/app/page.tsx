@@ -531,6 +531,39 @@ export default function VideoAnnotationEditor() {
     return resolvedCount !== f.faceCount
   })
 
+  // Get current groupings (IDs that appear in multiple frames)
+  const getCurrentGroupings = useCallback(() => {
+    if (!annotationData) return []
+
+    const idFrameMap = new Map<string, number[]>()
+    
+    // Collect all frames for each ID
+    Object.entries(annotationData.annotations).forEach(([frameStr, boxes]) => {
+      const frame = parseInt(frameStr)
+      boxes.forEach(box => {
+        if (!idFrameMap.has(box.id)) {
+          idFrameMap.set(box.id, [])
+        }
+        idFrameMap.get(box.id)!.push(frame)
+      })
+    })
+
+    // Filter to only include IDs that appear in multiple frames and sort frames
+    const groupings = Array.from(idFrameMap.entries())
+      .filter(([_, frames]) => frames.length > 1)
+      .map(([id, frames]) => ({
+        id,
+        frames: frames.sort((a, b) => a - b),
+        firstFrame: Math.min(...frames),
+        totalBoxes: frames.length
+      }))
+      .sort((a, b) => a.id.localeCompare(b.id))
+
+    return groupings
+  }, [annotationData])
+
+  const currentGroupings = getCurrentGroupings()
+
   // Show loading state while annotations are being loaded
   if (isLoadingAnnotations) {
     return (
@@ -653,12 +686,49 @@ export default function VideoAnnotationEditor() {
       </div>
     )}
     
-    {selectedBoxesForGrouping.length === 0 ? (
+    {/* Show current groupings when not in grouping mode and no boxes selected */}
+    {!isGroupingMode && selectedBoxesForGrouping.length === 0 ? (
+      <div className="h-full flex flex-col">
+        {currentGroupings.length === 0 ? (
+          <div className="text-muted-foreground text-center py-8">
+            No existing groupings found
+          </div>
+        ) : (
+          <>
+            <div className="info-label mb-4 flex-shrink-0">
+              {currentGroupings.length} existing group{currentGroupings.length > 1 ? 's' : ''}
+            </div>
+            <div className="flex-1 overflow-y-auto pr-1 min-h-0">
+              <div className="space-y-2">
+                {currentGroupings.map((grouping) => (
+                  <div
+                    key={grouping.id}
+                    className="flagged-frame-item flex items-center text-xs cursor-pointer hover:bg-muted/50 rounded p-2 transition-colors"
+                    onClick={() => {
+                      videoPlayerRef.current?.enterFrameByFrameAt(grouping.firstFrame)
+                    }}
+                  >
+                    <div className="flex-1 space-y-1">
+                      <div className="detection-value font-semibold">
+                        {grouping.id}
+                      </div>
+                      <div className="detection-label">
+                        {grouping.totalBoxes} boxes across {grouping.frames.length} frames
+                      </div>
+                      <div className="detection-label text-xs text-muted-foreground">
+                        Frames: {grouping.frames.slice(0, 5).join(', ')}{grouping.frames.length > 5 ? '...' : ''}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    ) : isGroupingMode && selectedBoxesForGrouping.length === 0 ? (
       <div className="text-muted-foreground text-center py-8">
-        {isGroupingMode 
-          ? "Click on boxes to add them to the group"
-          : "No boxes selected for grouping"
-        }
+        Click on boxes to add them to the group
       </div>
     ) : (
       <>
