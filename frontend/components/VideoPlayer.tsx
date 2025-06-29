@@ -113,12 +113,7 @@ export default function VideoPlayer({
       // In frame-by-frame mode, toggle between playing frame-by-frame and paused
       if (isPlaying) {
         // Currently playing frame-by-frame, so pause it
-        if (frameByFrameIntervalRef.current) {
-          clearInterval(frameByFrameIntervalRef.current)
-          frameByFrameIntervalRef.current = null
-        }
-        setIsPlaying(false)
-        onPlayStateChange(false)
+        stopFrameByFramePlayback()
       } else {
         // Currently paused in frame-by-frame mode, so resume frame-by-frame playback
         startFrameByFramePlayback()
@@ -136,7 +131,7 @@ export default function VideoPlayer({
       setIsPlaying(!isPlaying)
       onPlayStateChange(!isPlaying)
     }
-  }, [isPlaying, isFrameByFrameMode, onPlayStateChange, startFrameByFramePlayback])
+  }, [isPlaying, isFrameByFrameMode, onPlayStateChange, startFrameByFramePlayback, stopFrameByFramePlayback])
 
   const toggleFrameByFrameMode = useCallback(() => {
     if (isFrameByFrameMode) {
@@ -146,43 +141,57 @@ export default function VideoPlayer({
         frameByFrameIntervalRef.current = null
       }
       setIsFrameByFrameMode(false)
-      // Keep the current play state but switch to normal video playback
-      if (isPlaying && videoRef.current) {
-        videoRef.current.play()
+      
+      // Sync video time with current frame before switching to normal playback
+      if (videoRef.current) {
+        const time = currentFrame / fps
+        videoRef.current.currentTime = Math.min(time, duration)
+        setCurrentTime(time)
+        
+        // Keep the current play state but switch to normal video playback
+        if (isPlaying) {
+          videoRef.current.play()
+        }
       }
     } else {
       // Entering frame-by-frame mode
       if (videoRef.current) {
+        const wasPlaying = isPlaying || !videoRef.current.paused
         videoRef.current.pause() // Always pause the video element in frame-by-frame mode
-      }
-      setIsFrameByFrameMode(true)
-      // If we were playing, start frame-by-frame playback immediately
-      if (isPlaying) {
-        startFrameByFramePlayback()
-      }
-    }
-  }, [isFrameByFrameMode, isPlaying, startFrameByFramePlayback])
-
-  const seekToFrame = useCallback(
-    (frame: number) => {
-      if (videoRef.current && annotationData) {
-        // Stop frame-by-frame playback when manually seeking, but keep the mode
-        if (isFrameByFrameMode && frameByFrameIntervalRef.current) {
-          clearInterval(frameByFrameIntervalRef.current)
-          frameByFrameIntervalRef.current = null
-          setIsPlaying(false)
-          onPlayStateChange(false)
-        }
         
-        const time = frame / fps
-        videoRef.current.currentTime = Math.min(time, duration)
+        // Sync currentFrame with video's current position
+        const time = videoRef.current.currentTime
+        const frame = Math.floor(time * fps)
         setCurrentFrame(frame)
         setCurrentTime(time)
         onFrameChange(frame)
+        
+        setIsFrameByFrameMode(true)
+        // If we were playing, start frame-by-frame playback immediately
+        if (wasPlaying) {
+          startFrameByFramePlayback()
+        }
       }
-    },
-    [fps, duration, annotationData, onFrameChange, isFrameByFrameMode, onPlayStateChange],
-  )
+    }
+  }, [isFrameByFrameMode, isPlaying, startFrameByFramePlayback, currentFrame, fps, duration, onFrameChange])
+
+  const seekToFrame = useCallback((frame: number) => {
+    if (videoRef.current && annotationData) {
+      // Stop frame-by-frame playback when manually seeking, but keep the mode
+      if (isFrameByFrameMode && frameByFrameIntervalRef.current) {
+        clearInterval(frameByFrameIntervalRef.current)
+        frameByFrameIntervalRef.current = null
+        setIsPlaying(false)
+        onPlayStateChange(false)
+      }
+      
+      const time = frame / fps
+      videoRef.current.currentTime = Math.min(time, duration)
+      setCurrentFrame(frame)
+      setCurrentTime(time)
+      onFrameChange(frame)
+    }
+  }, [fps, duration, annotationData, onFrameChange, isFrameByFrameMode, onPlayStateChange])
 
   const stepFrame = useCallback(
     (direction: "forward" | "backward") => {
