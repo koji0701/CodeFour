@@ -63,6 +63,15 @@ export default function VideoPlayer({
     }
   }, [])
 
+  const stopFrameByFramePlayback = useCallback(() => {
+    if (frameByFrameIntervalRef.current) {
+      clearInterval(frameByFrameIntervalRef.current)
+      frameByFrameIntervalRef.current = null
+    }
+    setIsPlaying(false)
+    onPlayStateChange(false)
+  }, [onPlayStateChange])
+
   const startFrameByFramePlayback = useCallback(() => {
     if (videoRef.current) {
       // Ensure video is paused for frame-by-frame control
@@ -104,12 +113,7 @@ export default function VideoPlayer({
       // In frame-by-frame mode, toggle between playing frame-by-frame and paused
       if (isPlaying) {
         // Currently playing frame-by-frame, so pause it
-        if (frameByFrameIntervalRef.current) {
-          clearInterval(frameByFrameIntervalRef.current)
-          frameByFrameIntervalRef.current = null
-        }
-        setIsPlaying(false)
-        onPlayStateChange(false)
+        stopFrameByFramePlayback()
       } else {
         // Currently paused in frame-by-frame mode, so resume frame-by-frame playback
         startFrameByFramePlayback()
@@ -127,41 +131,61 @@ export default function VideoPlayer({
       setIsPlaying(!isPlaying)
       onPlayStateChange(!isPlaying)
     }
-  }, [isPlaying, isFrameByFrameMode, onPlayStateChange, startFrameByFramePlayback])
+  }, [isPlaying, isFrameByFrameMode, onPlayStateChange, startFrameByFramePlayback, stopFrameByFramePlayback])
 
-  const toggleFrameByFrameMode = useCallback(() => {
+  const toggleFrameByFrameMode = useCallback(async () => {
     if (isFrameByFrameMode) {
       // Exiting frame-by-frame mode
-      if (frameByFrameIntervalRef.current) {
-        clearInterval(frameByFrameIntervalRef.current)
-        frameByFrameIntervalRef.current = null
-      }
+      stopFrameByFramePlayback()
       setIsFrameByFrameMode(false)
-      // Keep the current play state but switch to normal video playback
-      if (isPlaying && videoRef.current) {
-        videoRef.current.play()
+      
+      // Sync video time with current frame before switching to normal playback
+      if (videoRef.current) {
+        const time = currentFrame / fps
+        videoRef.current.currentTime = Math.min(time, duration)
+        setCurrentTime(time)
+        
+        // Keep the current play state but switch to normal video playback
+        if (isPlaying) {
+          videoRef.current.play()
+        }
       }
     } else {
       // Entering frame-by-frame mode
       if (videoRef.current) {
+        const wasPlaying = isPlaying || !videoRef.current.paused
         videoRef.current.pause() // Always pause the video element in frame-by-frame mode
-      }
-      setIsFrameByFrameMode(true)
-      // If we were playing, start frame-by-frame playback immediately
-      if (isPlaying) {
-        startFrameByFramePlayback()
+        
+        // Sync currentFrame with video's current position
+        const time = videoRef.current.currentTime
+        const frame = Math.floor(time * fps)
+        setCurrentFrame(frame)
+        setCurrentTime(time)
+        onFrameChange(frame)
+        
+        // Force the current frame to be displayed
+        try {
+          await videoRef.current.play()
+          videoRef.current.pause()
+        } catch (e) {
+          // Ignore play errors
+        }
+        
+        setIsFrameByFrameMode(true)
+        
+        // If we were playing, start frame-by-frame playback immediately
+        if (wasPlaying) {
+          startFrameByFramePlayback()
+        }
       }
     }
-  }, [isFrameByFrameMode, isPlaying, startFrameByFramePlayback])
+  }, [isFrameByFrameMode, isPlaying, startFrameByFramePlayback, stopFrameByFramePlayback, currentFrame, fps, duration, onFrameChange])
 
-  const seekToFrame = useCallback((frame: number) => {
+  const seekToFrame = useCallback(async (frame: number) => {
     if (videoRef.current && annotationData) {
       // Stop frame-by-frame playback when manually seeking, but keep the mode
       if (isFrameByFrameMode && frameByFrameIntervalRef.current) {
-        clearInterval(frameByFrameIntervalRef.current)
-        frameByFrameIntervalRef.current = null
-        setIsPlaying(false)
-        onPlayStateChange(false)
+        stopFrameByFramePlayback()
       }
       
       const time = frame / fps
@@ -169,8 +193,18 @@ export default function VideoPlayer({
       setCurrentFrame(frame)
       setCurrentTime(time)
       onFrameChange(frame)
+      
+      // If in frame-by-frame mode, force frame rendering
+      if (isFrameByFrameMode) {
+        try {
+          await videoRef.current.play()
+          videoRef.current.pause()
+        } catch (e) {
+          // Ignore play errors
+        }
+      }
     }
-  }, [fps, duration, annotationData, onFrameChange, isFrameByFrameMode, onPlayStateChange])
+  }, [fps, duration, annotationData, onFrameChange, isFrameByFrameMode, stopFrameByFramePlayback])
 
   const stepFrame = useCallback(
     (direction: "forward" | "backward") => {
