@@ -26,7 +26,7 @@ class FaceDetectionProcessor:
     Processes videos using YOLO models to detect faces and export annotations.
     """
     
-    def __init__(self, model_path: str = "yolo11n-face.pt", confidence: float = 0.25, target_classes: Optional[List[str]] = None):
+    def __init__(self, model_path: str = "scripts/yolo11n-face.pt", confidence: float = 0.25, target_classes: Optional[List[str]] = None):
         """
         Initialize the face detection processor.
         
@@ -224,7 +224,7 @@ class FaceDetectionProcessor:
             print(f"Error saving annotations: {e}")
             print(f"Output path was: '{output_path}'")
     
-    def process_sample_videos(self, videos_dir: str = "../videos", output_dir: str = "../assets-json"):
+    def process_sample_videos(self, videos_dir: str = "videos", output_dir: str = "assets-json"):
         """
         Process all video files in the videos directory and save annotations.
         
@@ -310,8 +310,8 @@ Examples:
     parser.add_argument(
         "--model", "-m",
         type=str,
-        default="yolo11n.pt",
-        help="Path to YOLO model file (default: yolo11n.pt)"
+        default="scripts/yolo11n-face.pt",
+        help="Path to YOLO model file (default: yolo11n-face.pt)"
     )
     
     parser.add_argument(
@@ -330,15 +330,15 @@ Examples:
     parser.add_argument(
         "--videos-dir",
         type=str,
-        default="../videos",
-        help="Directory containing video files for batch processing (default: ../videos)"
+        default="videos",
+        help="Directory containing video files for batch processing (default: videos)"
     )
     
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="../assets-json",
-        help="Directory to save JSON files for batch processing (default: ../assets-json)"
+        default="assets-json",
+        help="Directory to save JSON files for batch processing (default: assets-json)"
     )
     
     args = parser.parse_args()
@@ -353,7 +353,7 @@ Examples:
     if args.video and not args.output:
         # Generate default output filename
         video_path = Path(args.video)
-        args.output = f"../assets-json/{video_path.stem}_annotations.json"    
+        args.output = f"assets-json/{video_path.stem}_annotations.json"    
     # Initialize processor
     print("Initializing YOLO Face Detection Processor...")
     processor = FaceDetectionProcessor(

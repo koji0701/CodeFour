@@ -10,7 +10,7 @@ import type { AnnotationData } from '@/lib/types'
 // projectRoot ─┬─ assets-json
 //              └─ frontend (process.cwd())
 //                          └─ app/api/annotations
-const annotationsFilePath = path.join(process.cwd(), '..', 'assets-json', 'test_annotations.json')
+const annotationsFilePath = path.join(process.cwd(), '..', 'assets-json', 'face_license_test_annotations.json')
 
 export async function GET() {
   try {

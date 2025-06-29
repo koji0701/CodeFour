@@ -391,7 +391,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
               }
             }}
           >
-            <source src="/videos/test.mp4" type="video/mp4" />
+            <source src="/videos/face_license_test.mp4" type="video/mp4" />
             Your browser does not support the video tag.
           </video>
           

@@ -254,7 +254,7 @@ export default function VideoAnnotationEditor() {
     // push last segment
     segments.push({ start, end: totalFrames - 1, count: currentCount })
 
-    // Identify flagged segments: 1-3 contiguous frames that have FEWER faces than matching surrounding segments.
+    // Identify flagged segments: 1-3 contiguous frames that have FEWER objects than matching surrounding segments.
     const flagged: { frame: number; faceCount: number }[] = []
     for (let i = 1; i < segments.length - 1; i++) {
       const prev = segments[i - 1]
@@ -484,7 +484,7 @@ export default function VideoAnnotationEditor() {
                                     })
                                   }}
                                 />
-                                <span className="font-mono">Frame {flagged.frame}, {flagged.faceCount} face{flagged.faceCount !== 1 ? 's' : ''}</span>
+                                <span className="font-mono">Frame {flagged.frame}, {flagged.faceCount} objects{flagged.faceCount !== 1 ? 's' : ''}</span>
                               </div>
                             ))}
                           </div>
