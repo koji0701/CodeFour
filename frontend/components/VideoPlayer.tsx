@@ -277,6 +277,13 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
             case "K":
                 toggleFrameByFrameMode();
                 break;
+            case "n":
+            case "N":
+                if (!isPlaying) {
+                  // create new bounding box
+                  onToggleAddMode()
+                }
+
             default:
                 break;
         }
@@ -352,11 +359,11 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
             Your browser does not support the video tag.
           </video>
           
-          {isFrameByFrameMode && (
+          {/* {isFrameByFrameMode && (
             <div className="absolute top-4 left-4 bg-blue-600 text-white px-3 py-1 rounded text-sm">
               Frame-by-Frame Mode
             </div>
-          )}
+          )} */}
         </div>
 
         <Card className="bg-gray-800 border-gray-700 p-4">
@@ -432,22 +439,30 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
                   </TooltipContent>
                 </Tooltip>
               </div>
-
+              
               {/* Add bounding box button (appears when paused) */}
               {!isPlaying && (
-                <Button
-                  variant={isAddMode ? "default" : "outline"}
-                  size="sm"
-                  onClick={onToggleAddMode}
-                  className={
-                    isAddMode
-                      ? "bg-red-600 border-red-500 hover:bg-red-700"
-                      : "bg-gray-700 border-gray-600 hover:bg-gray-600"
-                  }
-                  title={isAddMode ? "Cancel add box" : "Add bounding box"}
-                >
-                  {isAddMode ? <span className="font-bold">×</span> : <span className="font-bold">＋</span>}
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                      <Button
+                      variant={isAddMode ? "default" : "outline"}
+                      size="sm"
+                      onClick={onToggleAddMode}
+                      className={
+                        isAddMode
+                          ? "bg-red-600 border-red-500 hover:bg-red-700"
+                          : "bg-gray-700 border-gray-600 hover:bg-gray-600"
+                      }
+                      title={isAddMode ? "Cancel add box" : "Add bounding box"}
+                    >
+                      {isAddMode ? <span className="font-bold">×</span> : <span className="font-bold">＋</span>}
+                    </Button>
+
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Add bounding box (N)</p>
+                  </TooltipContent>
+                </Tooltip>
               )}
             </div>
 

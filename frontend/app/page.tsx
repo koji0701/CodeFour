@@ -297,8 +297,8 @@ export default function VideoAnnotationEditor() {
               <Card className="bg-gray-800 border-gray-700 p-4">
                 <Tabs defaultValue="video-info" className="w-full">
                   <TabsList className="grid w-full grid-cols-3 bg-gray-700">
+                  <TabsTrigger value="current-frame" className="text-xs">Current Frame</TabsTrigger>
                     <TabsTrigger value="video-info" className="text-xs">Video Info</TabsTrigger>
-                    <TabsTrigger value="current-frame" className="text-xs">Current Frame</TabsTrigger>
                     <TabsTrigger value="flagged-frames" className="text-xs">Flagged Frames</TabsTrigger>
                   </TabsList>
                   
