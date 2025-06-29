@@ -26,6 +26,7 @@ export default function VideoPlayer({
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const [currentFrame, setCurrentFrame] = useState(0)
+  const currentFrameRef = useRef(0)
   const [isFrameByFrameMode, setIsFrameByFrameMode] = useState(false)
 
   const fps = annotationData?.video_info.fps || 30
@@ -47,11 +48,17 @@ export default function VideoPlayer({
     }
   }, [])
 
+  // Keep ref in sync with state to avoid stale closures
+  useEffect(() => {
+    currentFrameRef.current = currentFrame
+  }, [currentFrame])
+
   const handleTimeUpdate = useCallback(() => {
     if (videoRef.current && !isFrameByFrameMode) {
       const time = videoRef.current.currentTime
       setCurrentTime(time)
       const frame = Math.floor(time * fps)
+      currentFrameRef.current = frame
       setCurrentFrame(frame)
       onFrameChange(frame)
     }
@@ -74,40 +81,32 @@ export default function VideoPlayer({
 
   const advanceFrame = useCallback(async () => {
     if (!videoRef.current) return false
-    
+
     const maxFrames = annotationData ? annotationData.video_info.frame_count - 1 : Math.floor(duration * fps)
-    
-    // Use state updater function to avoid stale closure
-    let nextFrame: number
-    let shouldContinue = false
-    
-    setCurrentFrame(prev => {
-      nextFrame = prev + 1
-      if (nextFrame > maxFrames) {
-        return prev // Don't update if we've reached the end
-      }
-      shouldContinue = true
-      return nextFrame
-    })
-    
-    if (!shouldContinue) {
+
+    const nextFrame = currentFrameRef.current + 1
+    if (nextFrame > maxFrames) {
       return false // Reached end
     }
-    
-    // Update the frame
+
+    // Persist next frame to state and ref
+    currentFrameRef.current = nextFrame
+    setCurrentFrame(nextFrame)
+
+    // Seek video to new time
     const time = nextFrame / fps
     videoRef.current.currentTime = Math.min(time, duration)
     setCurrentTime(time)
     onFrameChange(nextFrame)
-    
-    // Force the video to render the new frame
+
+    // Force the video element to render the frame (Safari fix)
     try {
       await videoRef.current.play()
       videoRef.current.pause()
-    } catch (e) {
-      // Ignore play errors
+    } catch (_) {
+      /* swallow */
     }
-    
+
     return true // Successfully advanced
   }, [fps, duration, annotationData, onFrameChange])
 
@@ -162,7 +161,7 @@ export default function VideoPlayer({
       
       // Sync video time with current frame before switching to normal playback
       if (videoRef.current) {
-        const time = currentFrame / fps
+        const time = currentFrameRef.current / fps
         videoRef.current.currentTime = Math.min(time, duration)
         setCurrentTime(time)
         
@@ -180,8 +179,9 @@ export default function VideoPlayer({
         // Sync currentFrame with video's current position
         const time = videoRef.current.currentTime
         const frame = Math.floor(time * fps)
-        setCurrentFrame(frame)
+        currentFrameRef.current = frame
         setCurrentTime(time)
+        setCurrentFrame(frame)
         onFrameChange(frame)
         
         // Force the current frame to be displayed
@@ -200,7 +200,7 @@ export default function VideoPlayer({
         }
       }
     }
-  }, [isFrameByFrameMode, isPlaying, startFrameByFramePlayback, stopFrameByFramePlayback, currentFrame, fps, duration, onFrameChange])
+  }, [isFrameByFrameMode, isPlaying, startFrameByFramePlayback, stopFrameByFramePlayback, currentFrameRef, fps, duration, onFrameChange])
 
   const seekToFrame = useCallback(async (frame: number) => {
     if (videoRef.current && annotationData) {
@@ -211,6 +211,7 @@ export default function VideoPlayer({
       
       const time = frame / fps
       videoRef.current.currentTime = Math.min(time, duration)
+      currentFrameRef.current = frame
       setCurrentFrame(frame)
       setCurrentTime(time)
       onFrameChange(frame)
@@ -229,11 +230,11 @@ export default function VideoPlayer({
 
   const stepFrame = useCallback(
     (direction: "forward" | "backward") => {
-      const newFrame =
-        direction === "forward" ? Math.min(currentFrame + 1, Math.floor(duration * fps)) : Math.max(currentFrame - 1, 0)
+      const base = currentFrameRef.current
+      const newFrame = direction === "forward" ? Math.min(base + 1, Math.floor(duration * fps)) : Math.max(base - 1, 0)
       seekToFrame(newFrame)
     },
-    [currentFrame, duration, fps, seekToFrame],
+    [duration, fps, seekToFrame],
   )
 
   const handleSliderChange = useCallback(
