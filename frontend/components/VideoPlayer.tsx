@@ -72,6 +72,45 @@ export default function VideoPlayer({
     onPlayStateChange(false)
   }, [onPlayStateChange])
 
+  const advanceFrame = useCallback(async () => {
+    if (!videoRef.current) return false
+    
+    const maxFrames = annotationData ? annotationData.video_info.frame_count - 1 : Math.floor(duration * fps)
+    
+    // Use state updater function to avoid stale closure
+    let nextFrame: number
+    let shouldContinue = false
+    
+    setCurrentFrame(prev => {
+      nextFrame = prev + 1
+      if (nextFrame > maxFrames) {
+        return prev // Don't update if we've reached the end
+      }
+      shouldContinue = true
+      return nextFrame
+    })
+    
+    if (!shouldContinue) {
+      return false // Reached end
+    }
+    
+    // Update the frame
+    const time = nextFrame / fps
+    videoRef.current.currentTime = Math.min(time, duration)
+    setCurrentTime(time)
+    onFrameChange(nextFrame)
+    
+    // Force the video to render the new frame
+    try {
+      await videoRef.current.play()
+      videoRef.current.pause()
+    } catch (e) {
+      // Ignore play errors
+    }
+    
+    return true // Successfully advanced
+  }, [fps, duration, annotationData, onFrameChange])
+
   const startFrameByFramePlayback = useCallback(() => {
     if (videoRef.current) {
       // Ensure video is paused for frame-by-frame control
@@ -79,34 +118,16 @@ export default function VideoPlayer({
       setIsPlaying(true)
       onPlayStateChange(true)
 
-      frameByFrameIntervalRef.current = setInterval(() => {
-        setCurrentFrame(prevFrame => {
-          const maxFrames = annotationData ? annotationData.video_info.frame_count - 1 : Math.floor(duration * fps)
-          const newFrame = prevFrame + 1
-          
-          if (newFrame > maxFrames) {
-            // Stop at the end
-            if (frameByFrameIntervalRef.current) {
-              clearInterval(frameByFrameIntervalRef.current)
-              frameByFrameIntervalRef.current = null
-            }
-            setIsPlaying(false)
-            onPlayStateChange(false)
-            return prevFrame
-          }
-
-          // Update video time and trigger frame change
-          if (videoRef.current) {
-            const time = newFrame / fps
-            videoRef.current.currentTime = Math.min(time, duration)
-            setCurrentTime(time)
-          }
-          onFrameChange(newFrame)
-          return newFrame
-        })
+      frameByFrameIntervalRef.current = setInterval(async () => {
+        const canContinue = await advanceFrame()
+        
+        if (!canContinue) {
+          // Stop at the end
+          stopFrameByFramePlayback()
+        }
       }, frameByFrameDelay)
     }
-  }, [fps, duration, annotationData, frameByFrameDelay, onFrameChange, onPlayStateChange])
+  }, [advanceFrame, frameByFrameDelay, onPlayStateChange, stopFrameByFramePlayback])
 
   const togglePlayPause = useCallback(() => {
     if (isFrameByFrameMode) {
