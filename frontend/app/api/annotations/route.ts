@@ -1,16 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { writeFile } from 'fs/promises'
+import { writeFile, readFile } from 'fs/promises'
 import path from 'path'
 import type { AnnotationData } from '@/lib/types'
+
+// Store the annotations file outside of the Next.js `frontend` directory so that
+// changes to the file don't trigger the dev server's file-watcher and force a
+// full page refresh.
+//
+// projectRoot ─┬─ assets-json
+//              └─ frontend (process.cwd())
+//                          └─ app/api/annotations
+const annotationsFilePath = path.join(process.cwd(), '..', 'assets-json', 'test_annotations.json')
+
+export async function GET() {
+  try {
+    const file = await readFile(annotationsFilePath, 'utf8')
+    return new NextResponse(file, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+  } catch (error) {
+    console.error('Failed to read annotations:', error)
+    return NextResponse.json(
+      { error: 'Failed to read annotations' },
+      { status: 500 },
+    )
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
     const data: AnnotationData = await request.json()
     
-    // Write to the public annotations file
-    const filePath = path.join(process.cwd(), 'public', 'annotations', 'test_annotations.json')
-    
-    await writeFile(filePath, JSON.stringify(data, null, 2))
+    await writeFile(annotationsFilePath, JSON.stringify(data, null, 2))
     
     return NextResponse.json({ success: true })
   } catch (error) {

@@ -55,7 +55,7 @@ export default function VideoAnnotationEditor() {
     const loadAnnotations = async () => {
       setIsLoadingAnnotations(true)
       try {
-        const response = await fetch('/annotations/test_annotations.json')
+        const response = await fetch('/api/annotations')
         if (!response.ok) {
           throw new Error(`Failed to load annotations: ${response.statusText}`)
         }
