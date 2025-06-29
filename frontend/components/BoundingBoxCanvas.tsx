@@ -12,9 +12,15 @@ interface BoundingBoxCanvasProps {
   isPlaying: boolean
   /** Whether we are currently in add-bounding-box mode */
   isAddMode: boolean
+  /** Add box mode: single or multi frame */
+  addBoxMode: "single" | "multi"
+  /** Current frame number */
+  currentFrame: number
   /** Callback once a new box has been successfully added (or cancelled) */
   onAddComplete: () => void
   onBoundingBoxUpdate: (boxes: BoundingBox[]) => void
+  /** Callback to show multi-frame modal with the new box */
+  onShowMultiFrameModal: (newBox: BoundingBox) => void
 }
 
 function BoundingBoxCanvas({
@@ -23,8 +29,11 @@ function BoundingBoxCanvas({
   videoInfo,
   isPlaying,
   isAddMode,
+  addBoxMode,
+  currentFrame,
   onAddComplete,
   onBoundingBoxUpdate,
+  onShowMultiFrameModal,
 }: BoundingBoxCanvasProps) {
   const stageRef = useRef<any>(null)
   const transformerRefs = useRef<{[key: string]: any}>({})
@@ -271,16 +280,26 @@ function BoundingBoxCanvas({
         type: "human",
         class: "manual",
       }
-      onBoundingBoxUpdate([...boundingBoxes, newBox])
+
+      if (addBoxMode === "multi") {
+        // In multi-frame mode, trigger modal in parent
+        onShowMultiFrameModal(newBox)
+      } else {
+        // Single frame mode - add directly
+        onBoundingBoxUpdate([...boundingBoxes, newBox])
+        onAddComplete()
+      }
+    } else {
+      // Box too small, just complete
+      onAddComplete()
     }
 
     // Reset drawing state
     setDrawStart(null)
     setDrawEnd(null)
-
-    // Inform parent regardless of success
-    onAddComplete()
   }
+
+
 
   if (stageSize.width === 0 || stageSize.height === 0 || videoDisplayArea.width === 0) {
     return null

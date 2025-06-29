@@ -29,6 +29,11 @@ export default function VideoAnnotationEditor() {
   const [isAddMode, setIsAddMode] = useState(false)
   const [isLoadingAnnotations, setIsLoadingAnnotations] = useState(true)
   const [resolvedFrames, setResolvedFrames] = useState<Map<number, number>>(new Map())
+  const [addBoxMode, setAddBoxMode] = useState<"single" | "multi">("single")
+  // Multi-frame modal state
+  const [showFrameCountInput, setShowFrameCountInput] = useState(false)
+  const [frameCountInput, setFrameCountInput] = useState("")
+  const [pendingBox, setPendingBox] = useState<BoundingBox | null>(null)
   const videoPlayerRef = useRef<VideoPlayerHandle | null>(null)
 
   // Load resolved frames from localStorage on mount
@@ -142,6 +147,69 @@ export default function VideoAnnotationEditor() {
     [annotationData, saveAnnotations],
   )
 
+  const handleMultiFrameBoundingBoxUpdate = useCallback(
+    (startFrame: number, frameCount: number, newBox: BoundingBox) => {
+      if (!annotationData) return
+
+      const maxFrame = annotationData.video_info.frame_count - 1
+      const endFrame = Math.min(startFrame + frameCount - 1, maxFrame)
+      
+      const updatedAnnotations = { ...annotationData.annotations }
+      
+      // Add the box to each frame in the range
+      for (let frame = startFrame; frame <= endFrame; frame++) {
+        const existingBoxes = updatedAnnotations[frame] || []
+        const boxWithUniqueId = {
+          ...newBox,
+          id: `${newBox.id}_f${frame}`, // Make ID unique per frame
+        }
+        updatedAnnotations[frame] = [...existingBoxes, boxWithUniqueId]
+      }
+
+      const updatedData = {
+        ...annotationData,
+        annotations: updatedAnnotations,
+      }
+
+      setAnnotationData(updatedData)
+      
+      // Save the updated data to the JSON file
+      saveAnnotations(updatedData)
+    },
+    [annotationData, saveAnnotations],
+  )
+
+  // Handle multi-frame modal
+  const handleShowMultiFrameModal = useCallback((newBox: BoundingBox) => {
+    setPendingBox(newBox)
+    setShowFrameCountInput(true)
+    setFrameCountInput("10") // Default to 10 frames
+  }, [])
+
+  const handleFrameCountConfirm = useCallback(() => {
+    if (pendingBox && showFrameCountInput) {
+      const frameCount = parseInt(frameCountInput, 10)
+      if (frameCount > 0) {
+        handleMultiFrameBoundingBoxUpdate(currentFrame, frameCount, pendingBox)
+      }
+    }
+    
+    // Reset state
+    setShowFrameCountInput(false)
+    setPendingBox(null)
+    setFrameCountInput("")
+    setIsAddMode(false)
+    document.body.style.cursor = "default"
+  }, [pendingBox, showFrameCountInput, frameCountInput, currentFrame, handleMultiFrameBoundingBoxUpdate])
+
+  const handleFrameCountCancel = useCallback(() => {
+    setShowFrameCountInput(false)
+    setPendingBox(null)
+    setFrameCountInput("")
+    setIsAddMode(false)
+    document.body.style.cursor = "default"
+  }, [])
+
   const currentBoundingBoxes = annotationData?.annotations[currentFrame] || []
 
   // Toggle add mode – ensure video is paused before allowing
@@ -243,6 +311,8 @@ export default function VideoAnnotationEditor() {
                   annotationData={annotationData}
                   isAddMode={isAddMode}
                   onToggleAddMode={toggleAddMode}
+                  addBoxMode={addBoxMode}
+                  onAddBoxModeChange={setAddBoxMode}
                 />
                 {videoElement && annotationData && (
                   <BoundingBoxCanvas
@@ -251,11 +321,14 @@ export default function VideoAnnotationEditor() {
                     videoInfo={annotationData.video_info}
                     isPlaying={isPlaying}
                     isAddMode={isAddMode}
+                    addBoxMode={addBoxMode}
+                    currentFrame={currentFrame}
                     onAddComplete={() => {
                       setIsAddMode(false)
                       document.body.style.cursor = "default"
                     }}
                     onBoundingBoxUpdate={(boxes) => handleBoundingBoxUpdate(currentFrame, boxes)}
+                    onShowMultiFrameModal={handleShowMultiFrameModal}
                   />
                 )}
                 {videoElement && annotationData && currentBoundingBoxes.length === 0 && !isAddMode && (
@@ -425,6 +498,53 @@ export default function VideoAnnotationEditor() {
           </div>
         </div>
       </div>
+
+      {/* Multi-frame input modal - outside canvas to avoid event conflicts */}
+      {showFrameCountInput && pendingBox && annotationData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 p-6 rounded-lg border border-gray-600">
+            <h3 className="text-white text-lg mb-4">Multi-Frame Box</h3>
+            <p className="text-gray-300 text-sm mb-4">
+              Enter the number of frames to apply this bounding box to:
+            </p>
+            <div className="flex items-center gap-3">
+              <input
+                type="number"
+                min="1"
+                max={annotationData.video_info.frame_count - currentFrame}
+                value={frameCountInput}
+                onChange={(e) => setFrameCountInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleFrameCountConfirm()
+                  } else if (e.key === "Escape") {
+                    handleFrameCountCancel()
+                  }
+                }}
+                className="bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 w-20"
+                placeholder="10"
+                autoFocus
+              />
+              <span className="text-gray-400 text-sm">frames</span>
+              <button
+                onClick={handleFrameCountConfirm}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm"
+              >
+                Apply
+              </button>
+              <button
+                onClick={handleFrameCountCancel}
+                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+            <p className="text-gray-400 text-xs mt-2">
+              Will apply to frames {currentFrame} - {Math.min(currentFrame + parseInt(frameCountInput || "0", 10) - 1, annotationData.video_info.frame_count - 1)}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

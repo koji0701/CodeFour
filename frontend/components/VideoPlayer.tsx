@@ -9,8 +9,16 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+} from "@/components/ui/dropdown-menu"
 import { TimelineScrubber } from "@/components/TimelineScrubber"
-import { Play, Pause, SkipBack, SkipForward, Timer } from "lucide-react"
+import { Play, Pause, SkipBack, SkipForward, Timer, Plus, Copy, ChevronDown } from "lucide-react"
 import type { AnnotationData } from "@/lib/types"
 
 interface VideoPlayerProps {
@@ -22,6 +30,9 @@ interface VideoPlayerProps {
   isAddMode: boolean
   /** Toggle the add-mode on / off */
   onToggleAddMode: () => void
+  /** Multi-frame mode settings */
+  addBoxMode: "single" | "multi"
+  onAddBoxModeChange: (mode: "single" | "multi") => void
 }
 
 export interface VideoPlayerHandle {
@@ -36,6 +47,8 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
   annotationData,
   isAddMode,
   onToggleAddMode,
+  addBoxMode,
+  onAddBoxModeChange,
 }: VideoPlayerProps, ref) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const frameByFrameIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -49,6 +62,29 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
   const fps = annotationData?.video_info.fps || 30
   // Frame-by-frame playback speed (milliseconds between frames)
   const frameByFrameDelay = 500 // 0.5 seconds per frame, adjust as needed
+
+  // Add box button content and handler
+  const getAddBoxIcon = () => {
+    if (isAddMode) {
+      return <span className="font-bold">×</span>
+    }
+    return addBoxMode === "multi" ? <Copy className="w-4 h-4" /> : <Plus className="w-4 h-4" />
+  }
+
+  const getAddBoxTooltip = () => {
+    if (isAddMode) {
+      return "Cancel add box"
+    }
+    return addBoxMode === "multi" ? "Add multi-frame box (N)" : "Add single-frame box (N)"
+  }
+
+  const handleMainButtonClick = () => {
+    onToggleAddMode()
+  }
+
+  const handleDropdownClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+  }
 
   useEffect(() => {
     if (videoRef.current) {
@@ -440,29 +476,65 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
                 </Tooltip>
               </div>
               
-              {/* Add bounding box button (appears when paused) */}
+              {/* Add bounding box button with dropdown (appears when paused) */}
               {!isPlaying && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                      <Button
-                      variant={isAddMode ? "default" : "outline"}
-                      size="sm"
-                      onClick={onToggleAddMode}
-                      className={
-                        isAddMode
-                          ? "bg-red-600 border-red-500 hover:bg-red-700"
-                          : "bg-gray-700 border-gray-600 hover:bg-gray-600"
-                      }
-                      title={isAddMode ? "Cancel add box" : "Add bounding box"}
-                    >
-                      {isAddMode ? <span className="font-bold">×</span> : <span className="font-bold">＋</span>}
-                    </Button>
-
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Add bounding box (N)</p>
-                  </TooltipContent>
-                </Tooltip>
+                <div className="flex items-center">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="relative flex">
+                        {/* Main button */}
+                        <Button
+                          variant={isAddMode ? "default" : "outline"}
+                          size="sm"
+                          onClick={handleMainButtonClick}
+                          className={`${
+                            isAddMode
+                              ? "bg-red-600 border-red-500 hover:bg-red-700"
+                              : "bg-gray-700 border-gray-600 hover:bg-gray-600"
+                          } rounded-r-none border-r-0`}
+                        >
+                          {getAddBoxIcon()}
+                        </Button>
+                        
+                        {/* Dropdown trigger */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant={isAddMode ? "default" : "outline"}
+                              size="sm"
+                              onClick={handleDropdownClick}
+                              className={`${
+                                isAddMode
+                                  ? "bg-red-600 border-red-500 hover:bg-red-700"
+                                  : "bg-gray-700 border-gray-600 hover:bg-gray-600"
+                              } rounded-l-none px-2`}
+                            >
+                              <ChevronDown className="w-3 h-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuRadioGroup 
+                              value={addBoxMode} 
+                              onValueChange={(value) => onAddBoxModeChange(value as "single" | "multi")}
+                            >
+                              <DropdownMenuRadioItem value="single" className="flex items-center gap-2">
+                                <Plus className="w-4 h-4" />
+                                Single Frame
+                              </DropdownMenuRadioItem>
+                              <DropdownMenuRadioItem value="multi" className="flex items-center gap-2">
+                                <Copy className="w-4 h-4" />
+                                Multi Frame
+                              </DropdownMenuRadioItem>
+                            </DropdownMenuRadioGroup>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{getAddBoxTooltip()}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
               )}
             </div>
 
