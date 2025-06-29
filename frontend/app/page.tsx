@@ -436,25 +436,25 @@ export default function VideoAnnotationEditor() {
   // Show loading state while annotations are being loaded
   if (isLoadingAnnotations) {
     return (
-      <div className="min-h-screen bg-gray-900 text-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400 mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading annotations...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading annotations...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-100">
+    <div className="min-h-screen bg-background text-foreground">
       <div className="container mx-auto p-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-screen">
           {/* Video Player Section */}
           <div className="lg:col-span-2">
-            <Card className="bg-gray-800 border-gray-700 p-4">
+            <Card className="control-panel p-4">
               <div className="relative">
                 {isSaving && (
-                  <div className="absolute top-4 right-4 bg-blue-600 text-white px-3 py-1 rounded text-sm z-10">
+                  <div className="absolute top-4 right-4 bg-primary text-primary-foreground px-3 py-1 rounded text-sm z-10">
                     Saving...
                   </div>
                 )}
@@ -499,20 +499,20 @@ export default function VideoAnnotationEditor() {
             {/* Detection Legend - Horizontal layout under video */}
             {annotationData && (
                 <div className="flex items-center justify-center space-x-6 text-sm mt-4">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-blue-400 rounded"></div>
+                  <div className="confidence-indicator">
+                    <div className="confidence-dot bg-accent"></div>
                     <span>Human-modified</span>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-green-500 rounded"></div>
+                  <div className="confidence-indicator">
+                    <div className="confidence-dot confidence-high"></div>
                     <span>High confidence (&gt;90%)</span>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-amber-500 rounded"></div>
+                  <div className="confidence-indicator">
+                    <div className="confidence-dot confidence-medium"></div>
                     <span>Medium confidence (70-90%)</span>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-red-500 rounded"></div>
+                  <div className="confidence-indicator">
+                    <div className="confidence-dot confidence-low"></div>
                     <span>Low confidence (&lt;70%)</span>
                   </div>
                 </div>
@@ -523,77 +523,79 @@ export default function VideoAnnotationEditor() {
           {/* Control Panel with Tabs */}
           <div className="space-y-4 h-full flex flex-col">
             {annotationData && (
-              <Card className="bg-gray-800 border-gray-700 p-4 flex-1 flex flex-col mb-6">
-              <Tabs defaultValue="video-info" className="w-full h-full flex flex-col">
-                  <TabsList className="grid w-full grid-cols-3 bg-gray-700 flex-shrink-0">
-                  <TabsTrigger value="current-frame" className="text-xs">Current Frame</TabsTrigger>
-                    <TabsTrigger value="video-info" className="text-xs">Video Info</TabsTrigger>
-                    <TabsTrigger value="flagged-frames" className="text-xs">Flagged Frames</TabsTrigger>
+              <Card className="control-panel p-4 flex-1 flex flex-col mb-6">
+              <Tabs defaultValue="video-info" className="tabs-enhanced">
+                  <TabsList className="tabs-list-enhanced">
+                  <TabsTrigger value="current-frame" className="tabs-trigger-enhanced">Current Frame</TabsTrigger>
+                    <TabsTrigger value="video-info" className="tabs-trigger-enhanced">Video Info</TabsTrigger>
+                    <TabsTrigger value="flagged-frames" className="tabs-trigger-enhanced">Flagged Frames</TabsTrigger>
                   </TabsList>
                   
                   <TabsContent value="video-info" className="mt-4 flex-1 overflow-y-auto">
-                    <div className="space-y-2 text-sm h-full">
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <span className="text-gray-400">Filename:</span>
-                          <p className="font-mono text-xs">{annotationData.video_info.filename}</p>
+                    <div className="space-y-4 text-sm h-full">
+                      <div className="video-info-grid">
+                        <div className="video-info-item">
+                          <span className="info-label">Filename:</span>
+                          <p className="info-value text-xs">{annotationData.video_info.filename}</p>
                         </div>
-                        <div>
-                          <span className="text-gray-400">Duration:</span>
-                          <p className="font-mono">{annotationData.video_info.duration.toFixed(2)}s</p>
+                        <div className="video-info-item">
+                          <span className="info-label">Duration:</span>
+                          <p className="info-value">{annotationData.video_info.duration.toFixed(2)}s</p>
                         </div>
-                        <div>
-                          <span className="text-gray-400">Resolution:</span>
-                          <p className="font-mono">
+                        <div className="video-info-item">
+                          <span className="info-label">Resolution:</span>
+                          <p className="info-value">
                             {annotationData.video_info.width}×{annotationData.video_info.height}
                           </p>
                         </div>
-                        <div>
-                          <span className="text-gray-400">FPS:</span>
-                          <p className="font-mono">{annotationData.video_info.fps}</p>
+                        <div className="video-info-item">
+                          <span className="info-label">FPS:</span>
+                          <p className="info-value">{annotationData.video_info.fps}</p>
                         </div>
-                        <div>
-                          <span className="text-gray-400">Frames:</span>
-                          <p className="font-mono">{annotationData.video_info.frame_count}</p>
+                        <div className="video-info-item">
+                          <span className="info-label">Frames:</span>
+                          <p className="info-value">{annotationData.video_info.frame_count}</p>
                         </div>
-                        <div>
-                          <span className="text-gray-400">Annotated:</span>
-                          <p className="font-mono">{Object.keys(annotationData.annotations).length}</p>
+                        <div className="video-info-item">
+                          <span className="info-label">Annotated:</span>
+                          <p className="info-value">{Object.keys(annotationData.annotations).length}</p>
                         </div>
                       </div>
                     </div>
                   </TabsContent>
                   
                   <TabsContent value="current-frame" className="mt-4 flex-1 overflow-y-auto">
-                    <div className="space-y-2 text-sm h-full">
-                      <div>
-                        <span className="text-gray-400">Frame:</span>
-                        <span className="ml-2 font-mono">{currentFrame}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-400">Detections:</span>
-                        <span className="ml-2 font-mono">{currentBoundingBoxes.length}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-400">Playing:</span>
-                        <span className="ml-2 font-mono">{isPlaying ? 'Yes' : 'No'}</span>
+                    <div className="space-y-4 text-sm h-full">
+                      <div className="video-info-grid">
+                        <div className="video-info-item">
+                          <span className="info-label">Frame: </span>
+                          <span className="info-value">{currentFrame}</span>
+                        </div>
+                        <div className="video-info-item">
+                          <span className="info-label">Detections: </span>
+                          <span className="info-value">{currentBoundingBoxes.length}</span>
+                        </div>
+                        <div className="video-info-item">
+                          <span className="info-label">Playing: </span>
+                          <span className="info-value">{isPlaying ? 'Yes' : 'No'}</span>
+                        </div>
                       </div>
                       
                       {currentBoundingBoxes.length > 0 && (
-                        <div className="mt-3">
-                          <span className="text-gray-400 text-xs">Object Detections:</span>
-                          <div className="mt-1 flex-1 min-h-0 overflow-y-auto space-y-1">
+                        <div className="mt-4 space-y-3">
+                          <span className="info-label">Object Detections:</span>
+                          <div className="flex-1 min-h-0 overflow-y-auto space-y-3">
                           {currentBoundingBoxes.map((box, index) => (
-                              <div key={box.id} className="text-xs bg-gray-700 p-2 rounded">
-                                <div className="font-mono text-xs">{box.id}</div>
-                                <div className="text-gray-400">
-                                  Confidence: {(box.confidence * 100).toFixed(1)}%
+                              <div key={box.id} className="detection-item">
+                                <div className="detection-value font-semibold mb-2">{box.id}</div>
+                                <div className="detection-label">
+                                  Confidence: <span className="detection-value">{(box.confidence * 100).toFixed(1)}%</span>
                                 </div>
-                                <div className="text-gray-400 text-xs">
-                                  Position: ({(box.x * 100).toFixed(1)}%, {(box.y * 100).toFixed(1)}%)
+                                <div className="detection-label">
+                                  Position: <span className="detection-value">({(box.x * 100).toFixed(1)}%, {(box.y * 100).toFixed(1)}%)</span>
                                 </div>
-                                <div className="text-gray-400 text-xs">
-                                  Type: <span className={box.type === 'human' ? 'text-blue-400' : 'text-green-400'}>
+                                <div className="detection-label">
+                                  Type: <span className={box.type === 'human' ? 'text-accent' : 'text-secondary'}>
                                     {box.type}
                                   </span>
                                 </div>
@@ -606,27 +608,27 @@ export default function VideoAnnotationEditor() {
                   </TabsContent>
                   
                   <TabsContent value="flagged-frames" className="mt-4 flex-1 overflow-y-auto">
-                    <div className="space-y-2 text-sm h-full">
+                    <div className="space-y-4 text-sm h-full">
                       {flaggedFrames.length === 0 ? (
-                        <div className="text-gray-400 text-center py-4">
+                        <div className="text-muted-foreground text-center py-8">
                           No flagged frames found
                         </div>
                       ) : (
                         <>
-                          <div className="text-gray-400 text-xs mb-2">
+                          <div className="info-label">
                             {flaggedFrames.length} frame{flaggedFrames.length > 1 ? 's' : ''} flagged
                           </div>
-                          <div className="max-h-64 overflow-y-auto space-y-1">
+                          <div className="max-h-64 overflow-y-auto space-y-3">
                             {flaggedFrames.map((flagged) => (
                               <div
                                 key={flagged.frame}
-                                className="flex items-center text-xs bg-gray-700 p-2 rounded cursor-pointer hover:bg-gray-600 transition-colors"
+                                className="flagged-frame-item flex items-center text-xs"
                                 onClick={() => {
                                   videoPlayerRef.current?.enterFrameByFrameAt(flagged.frame)
                                 }}
                               >
                                 <Checkbox
-                                  className="mr-2"
+                                  className="mr-3"
                                   onClick={(e) => e.stopPropagation()}
                                   onCheckedChange={(checked) => {
                                     setResolvedFrames((prev) => {
@@ -640,10 +642,10 @@ export default function VideoAnnotationEditor() {
                                     })
                                   }}
                                 />
-                                <div className="flex-1">
-                                  <span className="font-mono">Frame {flagged.frame}, {flagged.faceCount} object{flagged.faceCount !== 1 ? 's' : ''}</span>
+                                <div className="flex-1 space-y-1">
+                                  <div className="detection-value">Frame {flagged.frame}, {flagged.faceCount} object{flagged.faceCount !== 1 ? 's' : ''}</div>
                                   {flagged.reason && (
-                                    <div className="text-gray-400 text-xs mt-1">{flagged.reason}</div>
+                                    <div className="detection-label">{flagged.reason}</div>
                                   )}
                                 </div>
                               </div>
@@ -662,10 +664,10 @@ export default function VideoAnnotationEditor() {
 
       {/* Multi-frame input modal - outside canvas to avoid event conflicts */}
       {showFrameCountInput && pendingBox && annotationData && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-gray-800 p-6 rounded-lg border border-gray-600">
-            <h3 className="text-white text-lg mb-4">Multi-Frame Box</h3>
-            <p className="text-gray-300 text-sm mb-4">
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3 className="modal-title">Multi-Frame Box</h3>
+            <p className="modal-description">
               Enter the number of frames to apply this bounding box to:
             </p>
             <div className="flex items-center gap-3">
@@ -682,25 +684,25 @@ export default function VideoAnnotationEditor() {
                     handleFrameCountCancel()
                   }
                 }}
-                className="bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 w-20"
+                className="form-input w-20"
                 placeholder="10"
                 autoFocus
               />
-              <span className="text-gray-400 text-sm">frames</span>
+              <span className="text-muted-foreground text-sm">frames</span>
               <button
                 onClick={handleFrameCountConfirm}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm"
+                className="action-button-primary"
               >
                 Apply
               </button>
               <button
                 onClick={handleFrameCountCancel}
-                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded text-sm"
+                className="action-button-secondary"
               >
                 Cancel
               </button>
             </div>
-            <p className="text-gray-400 text-xs mt-2">
+            <p className="text-muted-foreground text-xs mt-2">
               Will apply to frames {currentFrame} - {Math.min(currentFrame + parseInt(frameCountInput || "0", 10) - 1, annotationData.video_info.frame_count - 1)}
             </p>
           </div>

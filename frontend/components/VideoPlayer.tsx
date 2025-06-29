@@ -431,7 +431,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
           )} */}
         </div>
 
-        <Card className="bg-gray-800 border-gray-700 p-4">
+        <Card className="bg-muted/30 border-border/50 p-4">
           <div className="space-y-4">
             {/* Main Controls */}
             <div className="flex items-center justify-between">
