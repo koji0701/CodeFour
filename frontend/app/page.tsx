@@ -227,9 +227,9 @@ export default function VideoAnnotationEditor() {
     })
   }, [isPlaying])
 
-  // Compute flagged frames based on face count deviations (see flagged-frames rule)
+  // Compute flagged frames based on object count deviations and low confidence objects
   const getFlaggedFrames = useCallback(() => {
-    if (!annotationData) return [] as { frame: number; faceCount: number }[]
+    if (!annotationData) return [] as { frame: number; faceCount: number; reason?: string }[]
 
     const totalFrames = annotationData.video_info.frame_count
     // Build an array of face counts for every frame (default 0 if not annotated)
@@ -255,7 +255,7 @@ export default function VideoAnnotationEditor() {
     segments.push({ start, end: totalFrames - 1, count: currentCount })
 
     // Identify flagged segments: 1-3 contiguous frames that have FEWER objects than matching surrounding segments.
-    const flagged: { frame: number; faceCount: number }[] = []
+    const flagged: { frame: number; faceCount: number; reason?: string }[] = []
     for (let i = 1; i < segments.length - 1; i++) {
       const prev = segments[i - 1]
       const curr = segments[i]
@@ -267,16 +267,38 @@ export default function VideoAnnotationEditor() {
 
       if (surroundsEqual && curr.count !== prev.count && segmentLength <= 3) {
         for (let f = curr.start; f <= curr.end; f++) {
-          flagged.push({ frame: f, faceCount: counts[f] })
+          flagged.push({ frame: f, faceCount: counts[f], reason: 'Object count deviation' })
         }
       }
     }
+
+    // Check for frames with low confidence objects (< 70%)
+    Object.entries(annotationData.annotations).forEach(([frameStr, boxes]) => {
+      const frame = parseInt(frameStr)
+      const hasLowConfidence = boxes.some(box => box.confidence < 0.7)
+      
+      if (hasLowConfidence) {
+        // Check if this frame is already flagged for object count deviation
+        const alreadyFlagged = flagged.find(f => f.frame === frame)
+        if (!alreadyFlagged) {
+          flagged.push({ frame, faceCount: counts[frame], reason: 'Low confidence detection' })
+        } else {
+          // Update reason to include both issues
+          alreadyFlagged.reason = 'Object count deviation & low confidence'
+        }
+      }
+    })
 
     return flagged.sort((a, b) => a.frame - b.frame)
   }, [annotationData])
 
   // Filter out frames the user has resolved
-  const flaggedFrames = getFlaggedFrames().filter((f) => resolvedFrames.get(f.frame) !== f.faceCount)
+  const flaggedFrames = getFlaggedFrames().filter((f) => {
+    const resolvedCount = resolvedFrames.get(f.frame)
+    // A frame is considered resolved if the user marked it as resolved 
+    // and the face count hasn't changed since then
+    return resolvedCount !== f.faceCount
+  })
 
   // Show loading state while annotations are being loaded
   if (isLoadingAnnotations) {
@@ -295,7 +317,7 @@ export default function VideoAnnotationEditor() {
       <div className="container mx-auto p-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-screen">
           {/* Video Player Section */}
-          <div className="lg:col-span-2 space-y-4">
+          <div className="lg:col-span-2">
             <Card className="bg-gray-800 border-gray-700 p-4">
               <div className="relative">
                 {isSaving && (
@@ -337,12 +359,9 @@ export default function VideoAnnotationEditor() {
                   </div>
                 )}
               </div>
-            </Card>
-
             {/* Detection Legend - Horizontal layout under video */}
             {annotationData && (
-              <Card className="bg-gray-800 border-gray-700 p-3">
-                <div className="flex items-center justify-center space-x-6 text-sm">
+                <div className="flex items-center justify-center space-x-6 text-sm mt-4">
                   <div className="flex items-center space-x-2">
                     <div className="w-3 h-3 bg-blue-400 rounded"></div>
                     <span>Human-modified</span>
@@ -360,23 +379,23 @@ export default function VideoAnnotationEditor() {
                     <span>Low confidence (&lt;70%)</span>
                   </div>
                 </div>
-              </Card>
             )}
+            </Card>
           </div>
 
           {/* Control Panel with Tabs */}
-          <div className="space-y-4">
+          <div className="space-y-4 h-full flex flex-col">
             {annotationData && (
-              <Card className="bg-gray-800 border-gray-700 p-4">
-                <Tabs defaultValue="video-info" className="w-full">
-                  <TabsList className="grid w-full grid-cols-3 bg-gray-700">
+              <Card className="bg-gray-800 border-gray-700 p-4 flex-1 flex flex-col mb-6">
+              <Tabs defaultValue="video-info" className="w-full h-full flex flex-col">
+                  <TabsList className="grid w-full grid-cols-3 bg-gray-700 flex-shrink-0">
                   <TabsTrigger value="current-frame" className="text-xs">Current Frame</TabsTrigger>
                     <TabsTrigger value="video-info" className="text-xs">Video Info</TabsTrigger>
                     <TabsTrigger value="flagged-frames" className="text-xs">Flagged Frames</TabsTrigger>
                   </TabsList>
                   
-                  <TabsContent value="video-info" className="mt-4">
-                    <div className="space-y-2 text-sm">
+                  <TabsContent value="video-info" className="mt-4 flex-1 overflow-y-auto">
+                    <div className="space-y-2 text-sm h-full">
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <span className="text-gray-400">Filename:</span>
@@ -408,8 +427,8 @@ export default function VideoAnnotationEditor() {
                     </div>
                   </TabsContent>
                   
-                  <TabsContent value="current-frame" className="mt-4">
-                    <div className="space-y-2 text-sm">
+                  <TabsContent value="current-frame" className="mt-4 flex-1 overflow-y-auto">
+                    <div className="space-y-2 text-sm h-full">
                       <div>
                         <span className="text-gray-400">Frame:</span>
                         <span className="ml-2 font-mono">{currentFrame}</span>
@@ -425,9 +444,9 @@ export default function VideoAnnotationEditor() {
                       
                       {currentBoundingBoxes.length > 0 && (
                         <div className="mt-3">
-                          <span className="text-gray-400 text-xs">Face Detections:</span>
-                          <div className="mt-1 max-h-32 overflow-y-auto space-y-1">
-                            {currentBoundingBoxes.map((box, index) => (
+                          <span className="text-gray-400 text-xs">Object Detections:</span>
+                          <div className="mt-1 flex-1 min-h-0 overflow-y-auto space-y-1">
+                          {currentBoundingBoxes.map((box, index) => (
                               <div key={box.id} className="text-xs bg-gray-700 p-2 rounded">
                                 <div className="font-mono text-xs">{box.id}</div>
                                 <div className="text-gray-400">
@@ -449,8 +468,8 @@ export default function VideoAnnotationEditor() {
                     </div>
                   </TabsContent>
                   
-                  <TabsContent value="flagged-frames" className="mt-4">
-                    <div className="space-y-2 text-sm">
+                  <TabsContent value="flagged-frames" className="mt-4 flex-1 overflow-y-auto">
+                    <div className="space-y-2 text-sm h-full">
                       {flaggedFrames.length === 0 ? (
                         <div className="text-gray-400 text-center py-4">
                           No flagged frames found
@@ -484,7 +503,12 @@ export default function VideoAnnotationEditor() {
                                     })
                                   }}
                                 />
-                                <span className="font-mono">Frame {flagged.frame}, {flagged.faceCount} objects{flagged.faceCount !== 1 ? 's' : ''}</span>
+                                <div className="flex-1">
+                                  <span className="font-mono">Frame {flagged.frame}, {flagged.faceCount} object{flagged.faceCount !== 1 ? 's' : ''}</span>
+                                  {flagged.reason && (
+                                    <div className="text-gray-400 text-xs mt-1">{flagged.reason}</div>
+                                  )}
+                                </div>
                               </div>
                             ))}
                           </div>

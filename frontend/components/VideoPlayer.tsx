@@ -476,66 +476,66 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
                 </Tooltip>
               </div>
               
-              {/* Add bounding box button with dropdown (appears when paused) */}
-              {!isPlaying && (
-                <div className="flex items-center">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="relative flex">
-                        {/* Main button */}
-                        <Button
-                          variant={isAddMode ? "default" : "outline"}
-                          size="sm"
-                          onClick={handleMainButtonClick}
-                          className={`${
-                            isAddMode
-                              ? "bg-red-600 border-red-500 hover:bg-red-700"
-                              : "bg-gray-700 border-gray-600 hover:bg-gray-600"
-                          } rounded-r-none border-r-0`}
-                        >
-                          {getAddBoxIcon()}
-                        </Button>
-                        
-                        {/* Dropdown trigger */}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant={isAddMode ? "default" : "outline"}
-                              size="sm"
-                              onClick={handleDropdownClick}
-                              className={`${
-                                isAddMode
-                                  ? "bg-red-600 border-red-500 hover:bg-red-700"
-                                  : "bg-gray-700 border-gray-600 hover:bg-gray-600"
-                              } rounded-l-none px-2`}
-                            >
-                              <ChevronDown className="w-3 h-3" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuRadioGroup 
-                              value={addBoxMode} 
-                              onValueChange={(value) => onAddBoxModeChange(value as "single" | "multi")}
-                            >
-                              <DropdownMenuRadioItem value="single" className="flex items-center gap-2">
-                                <Plus className="w-4 h-4" />
-                                Single Frame
-                              </DropdownMenuRadioItem>
-                              <DropdownMenuRadioItem value="multi" className="flex items-center gap-2">
-                                <Copy className="w-4 h-4" />
-                                Multi Frame
-                              </DropdownMenuRadioItem>
-                            </DropdownMenuRadioGroup>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{getAddBoxTooltip()}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-              )}
+              {/* Add bounding box button with dropdown (disabled when playing) */}
+              <div className="flex items-center">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="relative flex">
+                      {/* Main button */}
+                      <Button
+                        variant={isAddMode ? "default" : "outline"}
+                        size="sm"
+                        onClick={handleMainButtonClick}
+                        disabled={isPlaying}
+                        className={`${
+                          isAddMode
+                            ? "bg-red-600 border-red-500 hover:bg-red-700 disabled:bg-red-400 disabled:border-red-300"
+                            : "bg-gray-700 border-gray-600 hover:bg-gray-600 disabled:bg-gray-500 disabled:border-gray-400"
+                        } rounded-r-none border-r-0 disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        {getAddBoxIcon()}
+                      </Button>
+                      
+                      {/* Dropdown trigger */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant={isAddMode ? "default" : "outline"}
+                            size="sm"
+                            onClick={handleDropdownClick}
+                            disabled={isPlaying}
+                            className={`${
+                              isAddMode
+                                ? "bg-red-600 border-red-500 hover:bg-red-700 disabled:bg-red-400 disabled:border-red-300"
+                                : "bg-gray-700 border-gray-600 hover:bg-gray-600 disabled:bg-gray-500 disabled:border-gray-400"
+                            } rounded-l-none px-2 disabled:opacity-50 disabled:cursor-not-allowed`}
+                          >
+                            <ChevronDown className="w-3 h-3" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuRadioGroup 
+                            value={addBoxMode} 
+                            onValueChange={(value) => onAddBoxModeChange(value as "single" | "multi")}
+                          >
+                            <DropdownMenuRadioItem value="single" className="flex items-center gap-2">
+                              <Plus className="w-4 h-4" />
+                              Single Frame
+                            </DropdownMenuRadioItem>
+                            <DropdownMenuRadioItem value="multi" className="flex items-center gap-2">
+                              <Copy className="w-4 h-4" />
+                              Multi Frame
+                            </DropdownMenuRadioItem>
+                          </DropdownMenuRadioGroup>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{isPlaying ? "Pause video to add boxes" : getAddBoxTooltip()}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
             </div>
 
             {/* Timeline Scrubber */}
