@@ -1,11 +1,12 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import { Card } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import VideoPlayer from "@/components/VideoPlayer"
+import VideoPlayer, { VideoPlayerHandle } from "@/components/VideoPlayer"
 import type { AnnotationData, BoundingBox } from "@/lib/types"
 import dynamic from "next/dynamic"
+import { Checkbox } from "@/components/ui/checkbox"
 
 // Dynamically import the BoundingBoxCanvas component to avoid SSR issues
 const BoundingBoxCanvas = dynamic(
@@ -16,6 +17,9 @@ const BoundingBoxCanvas = dynamic(
   }
 );
 
+// Key for storing resolved frames in localStorage
+const RESOLVED_STORAGE_KEY = "codefour-resolved-frames"
+
 export default function VideoAnnotationEditor() {
   const [annotationData, setAnnotationData] = useState<AnnotationData | null>(null)
   const [currentFrame, setCurrentFrame] = useState(0)
@@ -24,6 +28,39 @@ export default function VideoAnnotationEditor() {
   const [isSaving, setIsSaving] = useState(false)
   const [isAddMode, setIsAddMode] = useState(false)
   const [isLoadingAnnotations, setIsLoadingAnnotations] = useState(true)
+  const [resolvedFrames, setResolvedFrames] = useState<Map<number, number>>(new Map())
+  const videoPlayerRef = useRef<VideoPlayerHandle | null>(null)
+
+  // Load resolved frames from localStorage on mount
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      const stored = window.localStorage.getItem(RESOLVED_STORAGE_KEY)
+      if (stored) {
+        const obj = JSON.parse(stored) as Record<string, number>
+        const map = new Map<number, number>(
+          Object.entries(obj).map(([k, v]) => [parseInt(k, 10), v])
+        )
+        setResolvedFrames(map)
+      }
+    } catch (err) {
+      console.error("Failed to load resolved frames", err)
+    }
+  }, [])
+
+  // Persist resolved frames whenever it changes
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      const obj: Record<number, number> = {}
+      resolvedFrames.forEach((count, frame) => {
+        obj[frame] = count
+      })
+      window.localStorage.setItem(RESOLVED_STORAGE_KEY, JSON.stringify(obj))
+    } catch (err) {
+      console.error("Failed to save resolved frames", err)
+    }
+  }, [resolvedFrames])
 
   const saveAnnotations = useCallback(async (data: AnnotationData) => {
     if (isSaving) return // Prevent multiple simultaneous saves
@@ -122,29 +159,56 @@ export default function VideoAnnotationEditor() {
     })
   }, [isPlaying])
 
-  // Get flagged frames (frames with low confidence detections)
+  // Compute flagged frames based on face count deviations (see flagged-frames rule)
   const getFlaggedFrames = useCallback(() => {
-    if (!annotationData) return []
-    
-    const flaggedFrames: { frame: number; reason: string; count: number }[] = []
-    
+    if (!annotationData) return [] as { frame: number; faceCount: number }[]
+
+    const totalFrames = annotationData.video_info.frame_count
+    // Build an array of face counts for every frame (default 0 if not annotated)
+    const counts: number[] = Array(totalFrames).fill(0)
     Object.entries(annotationData.annotations).forEach(([frameStr, boxes]) => {
       const frame = parseInt(frameStr)
-      const lowConfidenceBoxes = boxes.filter(box => box.confidence < 0.7)
-      
-      if (lowConfidenceBoxes.length > 0) {
-        flaggedFrames.push({
-          frame,
-          reason: `${lowConfidenceBoxes.length} low confidence detection${lowConfidenceBoxes.length > 1 ? 's' : ''}`,
-          count: lowConfidenceBoxes.length
-        })
-      }
+      counts[frame] = boxes.length
     })
-    
-    return flaggedFrames.sort((a, b) => a.frame - b.frame)
+
+    // Break counts into contiguous segments where the face count is identical
+    type Segment = { start: number; end: number; count: number }
+    const segments: Segment[] = []
+    let currentCount = counts[0]
+    let start = 0
+    for (let i = 1; i < totalFrames; i++) {
+      if (counts[i] !== currentCount) {
+        segments.push({ start, end: i - 1, count: currentCount })
+        currentCount = counts[i]
+        start = i
+      }
+    }
+    // push last segment
+    segments.push({ start, end: totalFrames - 1, count: currentCount })
+
+    // Identify flagged segments: 1-3 contiguous frames that have FEWER faces than matching surrounding segments.
+    const flagged: { frame: number; faceCount: number }[] = []
+    for (let i = 1; i < segments.length - 1; i++) {
+      const prev = segments[i - 1]
+      const curr = segments[i]
+      const next = segments[i + 1]
+
+      const segmentLength = curr.end - curr.start + 1
+
+      const surroundsEqual = prev.count === next.count
+
+      if (surroundsEqual && curr.count !== prev.count && segmentLength <= 3) {
+        for (let f = curr.start; f <= curr.end; f++) {
+          flagged.push({ frame: f, faceCount: counts[f] })
+        }
+      }
+    }
+
+    return flagged.sort((a, b) => a.frame - b.frame)
   }, [annotationData])
 
-  const flaggedFrames = getFlaggedFrames()
+  // Filter out frames the user has resolved
+  const flaggedFrames = getFlaggedFrames().filter((f) => resolvedFrames.get(f.frame) !== f.faceCount)
 
   // Show loading state while annotations are being loaded
   if (isLoadingAnnotations) {
@@ -172,6 +236,7 @@ export default function VideoAnnotationEditor() {
                   </div>
                 )}
                 <VideoPlayer
+                  ref={videoPlayerRef}
                   onVideoRef={setVideoElement}
                   onFrameChange={handleFrameChange}
                   onPlayStateChange={setIsPlaying}
@@ -324,19 +389,29 @@ export default function VideoAnnotationEditor() {
                           </div>
                           <div className="max-h-64 overflow-y-auto space-y-1">
                             {flaggedFrames.map((flagged) => (
-                              <div 
-                                key={flagged.frame} 
-                                className="text-xs bg-gray-700 p-2 rounded cursor-pointer hover:bg-gray-600 transition-colors"
+                              <div
+                                key={flagged.frame}
+                                className="flex items-center text-xs bg-gray-700 p-2 rounded cursor-pointer hover:bg-gray-600 transition-colors"
                                 onClick={() => {
-                                  setCurrentFrame(flagged.frame)
-                                  if (videoElement) {
-                                    const time = flagged.frame / (annotationData?.video_info.fps || 30)
-                                    videoElement.currentTime = time
-                                  }
+                                  videoPlayerRef.current?.enterFrameByFrameAt(flagged.frame)
                                 }}
                               >
-                                <div className="font-mono">Frame {flagged.frame}</div>
-                                <div className="text-red-400">{flagged.reason}</div>
+                                <Checkbox
+                                  className="mr-2"
+                                  onClick={(e) => e.stopPropagation()}
+                                  onCheckedChange={(checked) => {
+                                    setResolvedFrames((prev) => {
+                                      const next = new Map(prev)
+                                      if (checked) {
+                                        next.set(flagged.frame, flagged.faceCount)
+                                      } else {
+                                        next.delete(flagged.frame)
+                                      }
+                                      return next
+                                    })
+                                  }}
+                                />
+                                <span className="font-mono">Frame {flagged.frame}, {flagged.faceCount} face{flagged.faceCount !== 1 ? 's' : ''}</span>
                               </div>
                             ))}
                           </div>

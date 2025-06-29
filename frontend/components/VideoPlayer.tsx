@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useEffect, useState, useCallback } from "react"
+import { useRef, useEffect, useState, useCallback, forwardRef, useImperativeHandle } from "react"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { Card } from "@/components/ui/card"
@@ -18,14 +18,19 @@ interface VideoPlayerProps {
   onToggleAddMode: () => void
 }
 
-export default function VideoPlayer({
+export interface VideoPlayerHandle {
+  /** Seeks to given frame, pauses video, and ensures frame-by-frame mode */
+  enterFrameByFrameAt: (frame: number) => void
+}
+
+const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function VideoPlayer({
   onVideoRef,
   onFrameChange,
   onPlayStateChange,
   annotationData,
   isAddMode,
   onToggleAddMode,
-}: VideoPlayerProps) {
+}: VideoPlayerProps, ref) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const frameByFrameIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -263,6 +268,23 @@ export default function VideoPlayer({
 
   const maxFrames = annotationData ? annotationData.video_info.frame_count - 1 : Math.floor(duration * fps)
 
+  // Imperative handle for parent controls
+  useImperativeHandle(ref, () => ({
+    enterFrameByFrameAt: async (frame: number) => {
+      // Pause any playback first
+      if (videoRef.current) {
+        videoRef.current.pause()
+      }
+
+      await seekToFrame(frame)
+
+      // Ensure we are in frame-by-frame mode
+      if (!isFrameByFrameMode) {
+        toggleFrameByFrameMode()
+      }
+    },
+  }))
+
   return (
     <div className="space-y-4">
       <div className="relative bg-black rounded-lg overflow-hidden">
@@ -386,4 +408,6 @@ export default function VideoPlayer({
       </Card>
     </div>
   )
-}
+})
+
+export default VideoPlayer
