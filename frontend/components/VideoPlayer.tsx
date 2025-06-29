@@ -4,6 +4,12 @@ import { useRef, useEffect, useState, useCallback, forwardRef, useImperativeHand
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { Card } from "@/components/ui/card"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { Play, Pause, SkipBack, SkipForward, Timer } from "lucide-react"
 import type { AnnotationData } from "@/lib/types"
 
@@ -248,6 +254,41 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
     [duration, fps, seekToFrame],
   )
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+        // Ignore if typing in an input field to avoid conflicts
+        if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+            return;
+        }
+
+        switch (event.key) {
+            case " ":
+                event.preventDefault(); // Prevent page scroll
+                togglePlayPause();
+                break;
+            case "ArrowLeft":
+                stepFrame("backward");
+                break;
+            case "ArrowRight":
+                stepFrame("forward");
+                break;
+            case "k":
+            case "K":
+                toggleFrameByFrameMode();
+                break;
+            default:
+                break;
+        }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+        window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [togglePlayPause, stepFrame, toggleFrameByFrameMode]);
+
   const handleSliderChange = useCallback(
     (value: number[]) => {
       const frame = value[0]
@@ -286,127 +327,156 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
   }))
 
   return (
-    <div className="space-y-4">
-      <div className="relative bg-black rounded-lg overflow-hidden">
-        <video
-          ref={videoRef}
-          className="w-full h-auto max-h-[60vh] object-contain"
-          onTimeUpdate={handleTimeUpdate}
-          onLoadedMetadata={handleLoadedMetadata}
-          onPlay={() => {
-            if (!isFrameByFrameMode) {
-              setIsPlaying(true)
-              onPlayStateChange(true)
-            }
-          }}
-          onPause={() => {
-            if (!isFrameByFrameMode) {
-              setIsPlaying(false)
-              onPlayStateChange(false)
-            }
-          }}
-        >
-          <source src="/videos/test.mp4" type="video/mp4" />
-          Your browser does not support the video tag.
-        </video>
-        
-        {isFrameByFrameMode && (
-          <div className="absolute top-4 left-4 bg-blue-600 text-white px-3 py-1 rounded text-sm">
-            Frame-by-Frame Mode
-          </div>
-        )}
-      </div>
-
-      <Card className="bg-gray-800 border-gray-700 p-4">
-        <div className="space-y-4">
-          {/* Main Controls */}
-          <div className="flex items-center justify-between">
-            {/* Left control cluster */}
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => stepFrame("backward")}
-                className="bg-gray-700 border-gray-600 hover:bg-gray-600"
-              >
-                <SkipBack className="w-4 h-4" />
-              </Button>
-
-              <Button
-                variant="outline"
-                onClick={togglePlayPause}
-                className="bg-gray-700 border-gray-600 hover:bg-gray-600"
-              >
-                {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-              </Button>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => stepFrame("forward")}
-                className="bg-gray-700 border-gray-600 hover:bg-gray-600"
-              >
-                <SkipForward className="w-4 h-4" />
-              </Button>
-
-              <Button
-                variant={isFrameByFrameMode ? "default" : "outline"}
-                size="sm"
-                onClick={toggleFrameByFrameMode}
-                className={
-                  isFrameByFrameMode
-                    ? "bg-blue-600 border-blue-500 hover:bg-blue-700"
-                    : "bg-gray-700 border-gray-600 hover:bg-gray-600"
-                }
-                title="Frame-by-frame playback"
-              >
-                <Timer className="w-4 h-4" />
-              </Button>
+    <TooltipProvider>
+      <div className="space-y-4">
+        <div className="relative bg-black rounded-lg overflow-hidden">
+          <video
+            ref={videoRef}
+            className="w-full h-auto max-h-[60vh] object-contain"
+            onTimeUpdate={handleTimeUpdate}
+            onLoadedMetadata={handleLoadedMetadata}
+            onPlay={() => {
+              if (!isFrameByFrameMode) {
+                setIsPlaying(true)
+                onPlayStateChange(true)
+              }
+            }}
+            onPause={() => {
+              if (!isFrameByFrameMode) {
+                setIsPlaying(false)
+                onPlayStateChange(false)
+              }
+            }}
+          >
+            <source src="/videos/test.mp4" type="video/mp4" />
+            Your browser does not support the video tag.
+          </video>
+          
+          {isFrameByFrameMode && (
+            <div className="absolute top-4 left-4 bg-blue-600 text-white px-3 py-1 rounded text-sm">
+              Frame-by-Frame Mode
             </div>
+          )}
+        </div>
 
-            {/* Add bounding box button (appears when paused) */}
-            {!isPlaying && (
-              <Button
-                variant={isAddMode ? "default" : "outline"}
-                size="sm"
-                onClick={onToggleAddMode}
-                className={
-                  isAddMode
-                    ? "bg-red-600 border-red-500 hover:bg-red-700"
-                    : "bg-gray-700 border-gray-600 hover:bg-gray-600"
-                }
-                title={isAddMode ? "Cancel add box" : "Add bounding box"}
-              >
-                {isAddMode ? <span className="font-bold">×</span> : <span className="font-bold">＋</span>}
-              </Button>
-            )}
-          </div>
+        <Card className="bg-gray-800 border-gray-700 p-4">
+          <div className="space-y-4">
+            {/* Main Controls */}
+            <div className="flex items-center justify-between">
+              {/* Left control cluster */}
+              <div className="flex items-center space-x-4">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => stepFrame("backward")}
+                      className="bg-gray-700 border-gray-600 hover:bg-gray-600"
+                    >
+                      <SkipBack className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Skip Back (Left Arrow)</p>
+                  </TooltipContent>
+                </Tooltip>
 
-          {/* Timeline Scrubber */}
-          <div className="space-y-2">
-            <Slider
-              value={[currentFrame]}
-              onValueChange={handleSliderChange}
-              max={maxFrames}
-              step={1}
-              className="w-full"
-            />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      onClick={togglePlayPause}
+                      className="bg-gray-700 border-gray-600 hover:bg-gray-600"
+                    >
+                      {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{isPlaying ? "Pause" : "Play"} (Space)</p>
+                  </TooltipContent>
+                </Tooltip>
 
-            <div className="flex justify-between text-sm text-gray-400">
-              <span>Frame: {currentFrame}</span>
-              <span>
-                {formatTime(currentTime)} / {formatTime(duration)}
-              </span>
-              {isFrameByFrameMode && (
-                <span className="text-blue-400">
-                  Frame-by-Frame ({frameByFrameDelay}ms/frame)
-                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => stepFrame("forward")}
+                      className="bg-gray-700 border-gray-600 hover:bg-gray-600"
+                    >
+                      <SkipForward className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Skip Forward (Right Arrow)</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={isFrameByFrameMode ? "default" : "outline"}
+                      size="sm"
+                      onClick={toggleFrameByFrameMode}
+                      className={
+                        isFrameByFrameMode
+                          ? "bg-blue-600 border-blue-500 hover:bg-blue-700"
+                          : "bg-gray-700 border-gray-600 hover:bg-gray-600"
+                      }
+                    >
+                      <Timer className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Toggle Frame-by-Frame (K)</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+
+              {/* Add bounding box button (appears when paused) */}
+              {!isPlaying && (
+                <Button
+                  variant={isAddMode ? "default" : "outline"}
+                  size="sm"
+                  onClick={onToggleAddMode}
+                  className={
+                    isAddMode
+                      ? "bg-red-600 border-red-500 hover:bg-red-700"
+                      : "bg-gray-700 border-gray-600 hover:bg-gray-600"
+                  }
+                  title={isAddMode ? "Cancel add box" : "Add bounding box"}
+                >
+                  {isAddMode ? <span className="font-bold">×</span> : <span className="font-bold">＋</span>}
+                </Button>
               )}
             </div>
+
+            {/* Timeline Scrubber */}
+            <div className="space-y-2">
+              <Slider
+                value={[currentFrame]}
+                onValueChange={handleSliderChange}
+                max={maxFrames}
+                step={1}
+                className="w-full"
+              />
+
+              <div className="flex justify-between text-sm text-gray-400">
+                <span>Frame: {currentFrame}</span>
+                <span>
+                  {formatTime(currentTime)} / {formatTime(duration)}
+                </span>
+                {isFrameByFrameMode && (
+                  <span className="text-blue-400">
+                    Frame-by-Frame ({frameByFrameDelay}ms/frame)
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      </Card>
-    </div>
+        </Card>
+      </div>
+    </TooltipProvider>
   )
 })
 
