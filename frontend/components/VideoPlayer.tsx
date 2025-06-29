@@ -2,7 +2,6 @@
 
 import { useRef, useEffect, useState, useCallback, forwardRef, useImperativeHandle } from "react"
 import { Button } from "@/components/ui/button"
-import { Slider } from "@/components/ui/slider"
 import { Card } from "@/components/ui/card"
 import {
   Tooltip,
@@ -10,6 +9,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { TimelineScrubber } from "@/components/TimelineScrubber"
 import { Play, Pause, SkipBack, SkipForward, Timer } from "lucide-react"
 import type { AnnotationData } from "@/lib/types"
 
@@ -453,24 +453,36 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
 
             {/* Timeline Scrubber */}
             <div className="space-y-2">
-              <Slider
-                value={[currentFrame]}
-                onValueChange={handleSliderChange}
-                max={maxFrames}
-                step={1}
-                className="w-full"
-              />
+              <div className="relative">
+                <TimelineScrubber
+                  value={[currentFrame]}
+                  onValueChange={handleSliderChange}
+                  max={maxFrames}
+                  step={1}
+                  videoElement={videoRef.current}
+                  className="w-full"
+                />
+                
 
-              <div className="flex justify-between text-sm text-gray-400">
-                <span>Frame: {currentFrame}</span>
+              </div>
+
+              <div className="flex justify-between text-sm text-gray-400 font-mono">
+                {/* Left side: Time display */}
                 <span>
                   {formatTime(currentTime)} / {formatTime(duration)}
                 </span>
+
+                {/* Center (optional): Frame-by-frame mode indicator */}
                 {isFrameByFrameMode && (
                   <span className="text-blue-400">
                     Frame-by-Frame ({frameByFrameDelay}ms/frame)
                   </span>
                 )}
+
+                {/* Right side: Frame counter */}
+                <span>
+                  frame: {currentFrame}/{maxFrames}
+                </span>
               </div>
             </div>
           </div>
