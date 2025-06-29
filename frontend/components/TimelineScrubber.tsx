@@ -150,12 +150,12 @@ export function TimelineScrubber({
 
         {/* Playhead Position Indicator */}
         <div
-          className="absolute top-0 bottom-0 w-0.5 bg-red-500 shadow-lg z-20 transition-all duration-75"
+          className="absolute top-0 bottom-0 w-1 bg-blue-500 shadow-lg z-20 transition-all duration-75"
           style={{ left: `${currentPosition}%` }}
         >
           {/* Playhead handle */}
-          <div className="absolute -top-1 -left-1.5 w-3 h-3 bg-red-500 rounded-full shadow-md" />
-          <div className="absolute -bottom-1 -left-1.5 w-3 h-3 bg-red-500 rounded-full shadow-md" />
+          <div className="absolute -top-1 -left-1 w-3 h-3 bg-blue-500 rounded-full shadow-md" />
+          <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-blue-500 rounded-full shadow-md" />
         </div>
 
         {/* Hover Time Tooltip */}
