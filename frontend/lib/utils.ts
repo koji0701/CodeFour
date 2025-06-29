@@ -29,5 +29,6 @@ export function convertPixelToNormalized(
     y: pixelCoords.y / canvasHeight,
     width: pixelCoords.width / canvasWidth,
     height: pixelCoords.height / canvasHeight,
+    type: "human" as const,
   }
 }

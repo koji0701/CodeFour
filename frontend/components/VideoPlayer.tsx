@@ -18,7 +18,7 @@ import {
   DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu"
 import { TimelineScrubber } from "@/components/TimelineScrubber"
-import { Play, Pause, SkipBack, SkipForward, Timer, Plus, Copy, ChevronDown, Undo, Redo } from "lucide-react"
+import { Play, Pause, SkipBack, SkipForward, Timer, Plus, Copy, ChevronDown, Undo, Redo, Users } from "lucide-react"
 import type { AnnotationData } from "@/lib/types"
 
 interface VideoPlayerProps {
@@ -38,6 +38,10 @@ interface VideoPlayerProps {
   canRedo: boolean
   onUndo: () => void
   onRedo: () => void
+  /** Grouping functionality */
+  isGroupingMode: boolean
+  onStartGrouping: () => void
+  onCancelGrouping: () => void
 }
 
 export interface VideoPlayerHandle {
@@ -58,6 +62,9 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
   canRedo,
   onUndo,
   onRedo,
+  isGroupingMode,
+  onStartGrouping,
+  onCancelGrouping,
 }: VideoPlayerProps, ref) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const frameByFrameIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -90,6 +97,13 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
   const handleMainButtonClick = () => {
     onToggleAddMode()
   }
+
+  // Auto-enable frame-by-frame mode when grouping mode starts
+  useEffect(() => {
+    if (isGroupingMode && !isFrameByFrameMode) {
+      setIsFrameByFrameMode(true)
+    }
+  }, [isGroupingMode, isFrameByFrameMode])
 
   const handleDropdownClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -505,44 +519,8 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
                 </Tooltip>
               </div>
               
-              {/* Right control cluster: Undo/Redo + Add bounding box */}
+              {/* Right control cluster: Add bounding box + Group Boxes + Undo/Redo */}
               <div className="flex items-center space-x-2">
-                {/* Undo button */}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={onUndo}
-                      disabled={isPlaying || !canUndo}
-                      className="bg-gray-700 border-gray-600 hover:bg-gray-600 disabled:bg-gray-500 disabled:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Undo className="w-4 h-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{isPlaying ? "Pause video to undo" : canUndo ? `Undo (${navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl'}+Z)` : "No actions to undo"}</p>
-                  </TooltipContent>
-                </Tooltip>
-
-                {/* Redo button */}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={onRedo}
-                      disabled={isPlaying || !canRedo}
-                      className="bg-gray-700 border-gray-600 hover:bg-gray-600 disabled:bg-gray-500 disabled:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Redo className="w-4 h-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{isPlaying ? "Pause video to redo" : canRedo ? `Redo (${navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl'}+Y)` : "No actions to redo"}</p>
-                  </TooltipContent>
-                </Tooltip>
-
                 {/* Add bounding box button with dropdown */}
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -599,6 +577,64 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>{isPlaying ? "Pause video to add boxes" : getAddBoxTooltip()}</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                {/* Group Boxes button */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={isGroupingMode ? "default" : "outline"}
+                      size="sm"
+                      onClick={isGroupingMode ? onCancelGrouping : onStartGrouping}
+                      disabled={isPlaying}
+                      className={
+                        isGroupingMode
+                          ? "bg-orange-600 border-orange-500 hover:bg-orange-700 disabled:bg-orange-400 disabled:border-orange-300"
+                          : "bg-gray-700 border-gray-600 hover:bg-gray-600 disabled:bg-gray-500 disabled:border-gray-400"
+                      }
+                    >
+                      <Users className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{isPlaying ? "Pause video to group boxes" : isGroupingMode ? "Cancel grouping" : "Group boxes"}</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                {/* Undo button */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={onUndo}
+                      disabled={isPlaying || !canUndo}
+                      className="bg-gray-700 border-gray-600 hover:bg-gray-600 disabled:bg-gray-500 disabled:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Undo className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{isPlaying ? "Pause video to undo" : canUndo ? `Undo (${navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl'}+Z)` : "No actions to undo"}</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                {/* Redo button */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={onRedo}
+                      disabled={isPlaying || !canRedo}
+                      className="bg-gray-700 border-gray-600 hover:bg-gray-600 disabled:bg-gray-500 disabled:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Redo className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{isPlaying ? "Pause video to redo" : canRedo ? `Redo (${navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl'}+Y)` : "No actions to redo"}</p>
                   </TooltipContent>
                 </Tooltip>
               </div>

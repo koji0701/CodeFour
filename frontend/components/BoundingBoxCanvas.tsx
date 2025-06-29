@@ -4,6 +4,13 @@ import { useEffect, useRef, useState } from "react"
 import { Stage, Layer, Rect, Transformer, Group, Circle, Text, Line } from 'react-konva'
 import type { BoundingBox, VideoInfo } from "@/lib/types"
 
+// Interface for grouped boxes (defined outside to avoid duplicate)
+interface GroupedBox {
+  frame: number
+  boxId: string
+  box: BoundingBox
+}
+
 interface BoundingBoxCanvasProps {
   videoElement: HTMLVideoElement
   boundingBoxes: BoundingBox[]
@@ -21,6 +28,10 @@ interface BoundingBoxCanvasProps {
   onBoundingBoxUpdate: (boxes: BoundingBox[]) => void
   /** Callback to show multi-frame modal with the new box */
   onShowMultiFrameModal: (newBox: BoundingBox) => void
+  /** Grouping functionality */
+  isGroupingMode: boolean
+  onBoxClickForGrouping: (boxId: string, frame: number) => void
+  selectedBoxesForGrouping: GroupedBox[]
 }
 
 function BoundingBoxCanvas({
@@ -34,6 +45,9 @@ function BoundingBoxCanvas({
   onAddComplete,
   onBoundingBoxUpdate,
   onShowMultiFrameModal,
+  isGroupingMode,
+  onBoxClickForGrouping,
+  selectedBoxesForGrouping,
 }: BoundingBoxCanvasProps) {
   const stageRef = useRef<any>(null)
   const transformerRefs = useRef<{[key: string]: any}>({})
@@ -126,7 +140,13 @@ function BoundingBoxCanvas({
   }, [isPlaying, boundingBoxes])
 
   const handleRectClick = (id: string) => {
-    if (!isPlaying) {
+    if (isPlaying) return
+    
+    if (isGroupingMode) {
+      // In grouping mode, call the grouping handler instead of normal selection
+      onBoxClickForGrouping(id, currentFrame)
+    } else {
+      // Normal mode - handle selection
       setSelectedId(id === selectedId ? null : id)
     }
   }
@@ -322,13 +342,18 @@ function BoundingBoxCanvas({
           {boundingBoxes.map((box) => {
             const pixelCoords = convertNormalizedToPixel(box)
             const color = getBoxColor(box.confidence, box.type)
+            
+            // Check if this box is selected for grouping
+            const isSelectedForGrouping = selectedBoxesForGrouping.some(
+              gb => gb.frame === currentFrame && gb.boxId === box.id
+            )
 
             return (
               <Group 
                 key={box.id}
                 x={pixelCoords.x}
                 y={pixelCoords.y}
-                draggable={!isPlaying && !isAddMode}
+                draggable={!isPlaying && !isAddMode && !isGroupingMode}
                 onDragEnd={(e) => {
                   // Update the box position based on the group's new position
                   const group = e.target
@@ -348,9 +373,9 @@ function BoundingBoxCanvas({
                   })
                   onBoundingBoxUpdate(updatedBoxes)
                 }}
-                onMouseEnter={() => !isAddMode && handleMouseEnter(box.id)}
+                onMouseEnter={() => !isAddMode && !isGroupingMode && handleMouseEnter(box.id)}
                 onMouseLeave={handleMouseLeave}
-                listening={!isPlaying && !isAddMode}
+                listening={!isPlaying && (!isAddMode || isGroupingMode)}
               >
                 <Rect
                   id={box.id}
@@ -358,16 +383,27 @@ function BoundingBoxCanvas({
                   y={0}
                   width={pixelCoords.width}
                   height={pixelCoords.height}
-                  stroke={color}
-                  strokeWidth={box.type === "human" ? 3 : 2} // Thicker stroke for human-modified boxes
-                  fill={`${color}33`}
+                  stroke={isSelectedForGrouping ? "#ff6b35" : color} // Orange for selected grouping boxes
+                  strokeWidth={isSelectedForGrouping ? 4 : (box.type === "human" ? 3 : 2)} // Thicker stroke for grouping selection
+                  fill={isSelectedForGrouping ? "#ff6b3540" : `${color}33`}
                   onClick={() => handleRectClick(box.id)}
                   onTap={() => handleRectClick(box.id)}
                   onTransformEnd={(e) => handleRectTransform(box.id, e)}
                 />
                 
+                {/* Display box ID below the box */}
+                <Text
+                  text={box.id}
+                  x={0}
+                  y={pixelCoords.height + 2}
+                  fontSize={14}
+                  fontFamily="Arial"
+                  fill={isSelectedForGrouping ? "#ff6b35" : color}
+                  fontStyle="bold"
+                />
+                
                 {/* Delete X button on hover */}
-                {hoveredId === box.id && !isPlaying && (
+                {hoveredId === box.id && !isPlaying && !isGroupingMode && (
                   <Group
                     x={pixelCoords.width / 2}
                     y={pixelCoords.height / 2}
@@ -395,7 +431,7 @@ function BoundingBoxCanvas({
           })}
 
           {/* Individual transformers for each box when paused */}
-          {!isPlaying && !isAddMode && boundingBoxes.map((box) => (
+          {!isPlaying && !isAddMode && !isGroupingMode && boundingBoxes.map((box) => (
             <Transformer
               key={`transformer-${box.id}`}
               ref={(el) => {
