@@ -1,9 +1,6 @@
 """
 Main script for Multi-Object Detection Pipeline
 
-This script provides a simple interface to run both face and license plate detection
-for the React video annotation project. It processes all videos in the videos directory
-and outputs JSON annotations to the assets-json directory.
 """
 
 import argparse

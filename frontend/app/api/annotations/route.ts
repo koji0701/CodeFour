@@ -6,10 +6,7 @@ import type { AnnotationData } from '@/lib/types'
 // Store the annotations file outside of the Next.js `frontend` directory so that
 // changes to the file don't trigger the dev server's file-watcher and force a
 // full page refresh.
-//
-// projectRoot ─┬─ assets-json
-//              └─ frontend (process.cwd())
-//                          └─ app/api/annotations
+
 const annotationsFilePath = path.join(process.cwd(), '..', 'assets-json', 'face_license_test_annotations.json')
 
 export async function GET() {

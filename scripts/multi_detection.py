@@ -2,27 +2,7 @@
 """
 Multi-object detection video processor
 
-This module extends the existing face-detection pipeline to support **multiple** YOLO models
-(e.g. face and license-plate detection) in a single pass over every frame.  Each model is
-configured via a small `Detector` dataclass specifying the class names to keep.  The resulting
-JSON schema matches the one already consumed by the React annotation app, with an added
-`class` field identifying the object type ("face", "license_plate", etc.).
-
-Typical usage (single video):
-
-    from multi_detection import Detector, MultiObjectDetectionProcessor
-
-    detectors = [
-        Detector(name="face", model_path="yolo11n-face.pt", target_classes=["face"], conf=0.25),
-        Detector(name="license_plate", model_path="morsetechlab/yolov11-license-plate-detection", 
-                 target_classes=["license_plate"], conf=0.25),
-    ]
-
-    processor = MultiObjectDetectionProcessor(detectors)
-    processor.process_video("videos/test.mp4", "assets-json/test_annotations.json")
-
-The processor also offers a `process_sample_videos()` helper mirroring the face-only
-implementation to batch-process every video under a directory.
+This is the main pipeline
 """
 from __future__ import annotations
 
@@ -147,7 +127,7 @@ class MultiObjectDetectionProcessor:
                     # Debug: Print available class names for this detector (only first frame)
                     if frame_no == 0 and hasattr(res, "names"):
                         available_classes = {idx: name for idx, name in res.names.items()}
-                        print(f"[DEBUG] {det.name} model classes: {available_classes}")
+                        # print(f"[DEBUG] {det.name} model classes: {available_classes}")
                     for i, box in enumerate(xyxy):
                         # Get detected class info
                         detected_class_name = det.name  # fallback to detector name
@@ -156,9 +136,9 @@ class MultiObjectDetectionProcessor:
                             detected_class_id = int(cls_idx[i])
                             detected_class_name = res.names.get(detected_class_id, f"class_{detected_class_id}")
                             
-                            # Debug: Print detected class (first few detections per detector)
-                            if detection_counts[det.name] < 5:
-                                print(f"[DEBUG] {det.name} detected class ID {detected_class_id}: '{detected_class_name}'")
+                            # # Debug: Print detected class (first few detections per detector)
+                            # if detection_counts[det.name] < 5:
+                            #     # print(f"[DEBUG] {det.name} detected class ID {detected_class_id}: '{detected_class_name}'")
                         
                         # For license plate detector, we already know it's detecting 'License_Plate' class
                         # Since we set target_classes=[] in main.py, we accept all detections
